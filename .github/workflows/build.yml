@@ -3,7 +3,18 @@ name: Build
 on:
   push:
     branches: [main]
-    tags: ['v*']
+    # Both shapes, deliberately. The convention is "v1.2.3", but the 1.0.2
+    # release was tagged "1.0.2" and a tag that matches no filter starts no run
+    # at all: no job, no red cross, no notification, just a release with nothing
+    # attached to it. A missing "v" must build, not vanish. The update check
+    # trims a leading "v" already (internal/update.Compare), so either name
+    # works everywhere else.
+    # 'v*' is left exactly as it was rather than tidied into one cleverer
+    # pattern: it is the one filter proven to work in production (v1.0.0 and
+    # v1.0.1 both built and released from it). The second entry is added
+    # alongside it, so the worst case if a character class behaves differently
+    # from what the docs say is today's behaviour, never less.
+    tags: ['v*', '[0-9]*']
   pull_request:
     branches: [main]
 
@@ -114,7 +125,10 @@ jobs:
   release:
     name: Release
     needs: build
-    if: startsWith(github.ref, 'refs/tags/v')
+    # Any tag, because the trigger filter above already decides which tags start
+    # a run. Keying this on "refs/tags/v" was the second half of the 1.0.2
+    # fault: even had the run started, the release job would have skipped.
+    if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     permissions:
       contents: write

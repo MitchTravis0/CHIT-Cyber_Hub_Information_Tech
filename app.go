@@ -11,8 +11,12 @@ import (
 // Version is shown on the settings page, in bug reports, and is what the update
 // check compares against the latest GitHub release. Bumping this is not the same
 // as tagging: no agent on this project runs a write-side git command, so the
-// matching "v1.0.0" tag is pushed by the repo owner.
-const Version = "1.0.0"
+// matching "v1.0.2" tag is pushed by the repo owner.
+//
+// Bump this BEFORE cutting the tag. v1.0.1 and 1.0.2 were both released with
+// this constant still reading 1.0.0, so those binaries report the wrong version
+// on the settings page and tell every user an update is available for ever.
+const Version = "1.0.2"
 
 // App is the single bound struct. Tools hang their StartX / request-response
 // methods off it and use a.jobs for anything long running.

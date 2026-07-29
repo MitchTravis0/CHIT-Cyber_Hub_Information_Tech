@@ -47,7 +47,7 @@ func TestVersionIsComparable(t *testing.T) {
 	// The literal is written in rather than read from the constant: this is the
 	// version being shipped, and changing the constant should be a deliberate
 	// act that fails here first.
-	if Version != "1.0.0" {
-		t.Errorf("Version = %q, want %q. If this is intentional, update the literal and the git tag together.", Version, "1.0.0")
+	if Version != "1.0.2" {
+		t.Errorf("Version = %q, want %q. If this is intentional, update the literal and the git tag together.", Version, "1.0.2")
 	}
 }
