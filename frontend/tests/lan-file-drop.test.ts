@@ -5,7 +5,6 @@ import {
   directionLabel,
   fileListLine,
   statusLabel,
-  shareUrl,
   summaryLine,
   toPicked,
   transferId,
@@ -13,14 +12,17 @@ import {
   validPort,
 } from '../src/tools/lan-file-drop/session.ts'
 import type { Transfer } from '../src/tools/lan-file-drop/api.ts'
+import { linkForAddress } from '../src/tools/lan-throughput/reading.ts'
 
-test('shareUrl builds the address a tech reads out', () => {
-  assert.equal(shareUrl('192.168.1.44', 8722, 'k3f9x2qp'), 'http://192.168.1.44:8722/d/k3f9x2qp')
-  assert.equal(shareUrl('10.0.0.5', 1024, 'abc'), 'http://10.0.0.5:1024/d/abc')
-})
-
-test('shareUrl brackets an IPv6 literal, or the port reads as part of it', () => {
-  assert.equal(shareUrl('fd00::1', 8722, 'x'), 'http://[fd00::1]:8722/d/x')
+test('the shared link follows the address picker, keeping the /d/ path and token', () => {
+  // The page rewrites the host of the link the backend built rather than
+  // rebuilding it, so the scheme, port, path segment and token are always Go's.
+  const built = 'http://10.2.136.81:8722/d/k3f9x2qp'
+  assert.equal(linkForAddress(built, '192.168.1.44'), 'http://192.168.1.44:8722/d/k3f9x2qp')
+  assert.equal(linkForAddress(built, 'fd00::1'), 'http://[fd00::1]:8722/d/k3f9x2qp')
+  // Before the address list arrives there is nothing to pick, and the link the
+  // backend built must show unchanged rather than blanking.
+  assert.equal(linkForAddress(built, ''), built)
 })
 
 test('baseName handles both separators', () => {

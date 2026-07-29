@@ -14,11 +14,12 @@ export interface Summary {
   bytesIn: number
 }
 
-/** The address to read out or point a camera at. IPv6 has to be bracketed. */
-export function shareUrl(ip: string, port: number, token: string): string {
-  const host = ip.includes(':') ? `[${ip}]` : ip
-  return `http://${host}:${port}/d/${token}`
-}
+// shareUrl lived here until 2026-07-29. It rebuilt the sharing link from an
+// address, a port and a token, which mirrored filedrop.URLFor in Go with no
+// golden file pinning the two (CONVENTIONS 8.3). Nothing ever called it. The
+// page swaps the host in the link the backend built instead, through
+// linkForAddress, so the scheme, port and /d/ segment are always Go's and the
+// two languages cannot drift. Do not bring it back.
 
 /** The last path segment, whichever separator the operating system uses. */
 export function baseName(path: string): string {

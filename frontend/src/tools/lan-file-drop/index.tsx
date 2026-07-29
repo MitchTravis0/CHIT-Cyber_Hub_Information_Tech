@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { FilePlus, FolderOpen, Send, Square, X } from 'lucide-react'
+import { FilePlus, FolderOpen, QrCode as QrCodeIcon, Send, Square, X } from 'lucide-react'
 import {
   Button,
   CopyButton,
@@ -26,8 +26,14 @@ import {
   startFileDrop,
   type Address,
   type QrCode,
+  type Session,
   type Transfer,
 } from './api'
+// One pure, tested function imported from a sibling tool under
+// SPECS/CONVENTIONS.md 2.3.1, rather than a second copy of the same URL
+// surgery. Both tools feed a QR code with the link it returns, so a private
+// copy free to drift is exactly the fork that rule exists to prevent.
+import { linkForAddress } from '../lan-throughput/reading'
 import {
   directionLabel,
   fileListLine,
@@ -52,7 +58,8 @@ export default function LanFileDropPage() {
   const [addresses, setAddresses] = useState<Address[]>([])
   const [chosenIp, setChosenIp] = useState('')
   const [jobId, setJobId] = useState<string | null>(null)
-  const [url, setUrl] = useState('')
+  const [session, setSession] = useState<Session | null>(null)
+  const [showQr, setShowQr] = useState(true)
   const [qr, setQr] = useState<QrCode | null>(null)
 
   useEffect(() => {
@@ -67,12 +74,40 @@ export default function LanFileDropPage() {
   // captured there. Reported as a gap in useJob.
   useEffect(() => {
     if (jobId === null) return
-    void fileDropSession(jobId).then((session) => {
-      if (session === null || session.url === '') return
-      setUrl(session.url)
-      void generateQr(session.url).then(setQr)
+    void fileDropSession(jobId).then((found) => {
+      if (found === null || found.url === '') return
+      setSession(found)
     })
   }, [jobId])
+
+  // The backend builds its link from the address it decided to offer first. The
+  // "Address to show" picker used to set a value nothing read, so on a laptop
+  // with two adapters the page kept showing the wrong one and the QR code
+  // encoded it too.
+  //
+  // Only the host is swapped, in the backend's own string. This tool's shareUrl
+  // rebuilds the link from parts instead, which mirrors filedrop.URLFor in Go
+  // with nothing pinning the two together (CONVENTIONS 8.3), so calling it here
+  // would turn a dormant duplication into a live one.
+  const url = useMemo(() => linkForAddress(session?.url ?? '', chosenIp), [session, chosenIp])
+
+  // Nothing is generated until the code is on show, and the payload is the link
+  // beside it rather than the one the backend built, so picking a different
+  // address regenerates it. The guard drops a slow answer for an address that
+  // has already been changed again.
+  useEffect(() => {
+    if (!showQr || url === '') {
+      setQr(null)
+      return
+    }
+    let current = true
+    void generateQr(url).then((code) => {
+      if (current) setQr(code)
+    })
+    return () => {
+      current = false
+    }
+  }, [showQr, url])
 
   const totalBytes = 0 // sizes are not known until the backend stats them
 
@@ -83,8 +118,7 @@ export default function LanFileDropPage() {
       return
     }
     setPortError(null)
-    setUrl('')
-    setQr(null)
+    setSession(null)
 
     await start(async () => {
       const id = await startFileDrop({
@@ -227,16 +261,6 @@ export default function LanFileDropPage() {
               error={portError ?? undefined}
               hint="Change this only if something else is already using it."
             />
-            {addressOptions.length > 1 && (
-              <Select
-                label="Address to show"
-                options={addressOptions}
-                value={chosenIp}
-                onChange={(event) => setChosenIp(event.target.value)}
-                disabled={running}
-                hint="A laptop on wifi and a cable at once has two; only one reaches the other machine."
-              />
-            )}
             <div className="flex flex-col gap-2 text-sm">
               <label className="flex items-center gap-2 text-fg">
                 <input
@@ -302,9 +326,27 @@ export default function LanFileDropPage() {
         {running && url !== '' && (
           <div className="flex flex-wrap items-center gap-4 rounded border border-accent bg-surface-2 px-3 py-3">
             <div className="min-w-56 flex-1">
+              {addressOptions.length > 1 && (
+                <div className="mb-2 max-w-xs">
+                  <Select
+                    label="Address to show"
+                    options={addressOptions}
+                    value={chosenIp}
+                    onChange={(event) => setChosenIp(event.target.value)}
+                    hint="A laptop on wifi and a cable at once has two; only one reaches the other machine."
+                  />
+                </div>
+              )}
               <p className="font-mono text-lg break-all text-fg">{url}</p>
-              <div className="mt-2 flex items-center gap-2">
+              <div className="mt-2 flex flex-wrap items-center gap-2">
                 <CopyButton value={url} label="Copy link" />
+                <Button
+                  size="sm"
+                  onClick={() => setShowQr((shown) => !shown)}
+                  icon={<QrCodeIcon size={14} aria-hidden />}
+                >
+                  {showQr ? 'Hide QR code' : 'Show QR code'}
+                </Button>
               </div>
               <p className="mt-2 text-xs text-fg-muted">
                 Open this on the other machine's browser. It works on a phone too. Anyone on this
@@ -312,7 +354,7 @@ export default function LanFileDropPage() {
                 are done.
               </p>
             </div>
-            {qr !== null && <QrPanel code={qr} />}
+            {showQr && qr !== null && <QrPanel code={qr} />}
           </div>
         )}
 

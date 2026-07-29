@@ -46,6 +46,33 @@ export function curlFor(url: string): string {
   return `curl -o /dev/null ${url}/dl`
 }
 
+/**
+ * The link rebuilt for the address the tech picked. The backend builds it from
+ * the address it decided to offer first, and only the host part changes.
+ *
+ * It is a named function rather than an expression inside the page because two
+ * things read it, the link on screen and the QR code's payload, and a mismatch
+ * would hand the other machine a code that scans cleanly and points at the
+ * wrong adapter. An IPv6 address is bracketed; anything that does not look like
+ * a host and port is left exactly as it was.
+ */
+export function linkForAddress(url: string, ip: string): string {
+  if (url === '' || ip === '') return url
+  const slashes = url.indexOf('//')
+  if (slashes < 0) return url
+
+  const from = slashes + 2
+  const end = url.indexOf('/', from)
+  const authority = end < 0 ? url.slice(from) : url.slice(from, end)
+
+  const colon = authority.lastIndexOf(':')
+  // A colon inside brackets is part of an IPv6 literal, not a port separator.
+  if (colon < 0 || colon < authority.lastIndexOf(']')) return url
+
+  const host = ip.includes(':') ? `[${ip}]` : ip
+  return url.slice(0, from) + host + authority.slice(colon) + (end < 0 ? '' : url.slice(end))
+}
+
 /** What the Result column says. */
 export function statusLabel(status: string): string {
   return status === 'ok' ? 'Complete' : 'Stopped part way'

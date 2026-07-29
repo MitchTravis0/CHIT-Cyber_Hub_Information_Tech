@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import {
   curlFor,
+  linkForAddress,
   localTime,
   mbpsText,
   pullId,
@@ -60,6 +61,46 @@ test('curlFor appends the download path', () => {
   assert.equal(
     curlFor('http://[fe80::1]:8740/t/abc'),
     'curl -o /dev/null http://[fe80::1]:8740/t/abc/dl',
+  )
+})
+
+test('linkForAddress swaps only the host', () => {
+  const url = 'http://10.40.21.153:8740/t/a1b2c3d4e5f6a7b8'
+  assert.equal(linkForAddress(url, '192.168.1.44'), 'http://192.168.1.44:8740/t/a1b2c3d4e5f6a7b8')
+  // The port, the /t/ segment and the token must survive untouched, which is
+  // what makes the QR code and the link on screen the same address.
+  assert.equal(linkForAddress(url, '10.40.21.153'), url)
+})
+
+test('linkForAddress brackets an IPv6 address and replaces a bracketed one', () => {
+  const v4 = 'http://10.40.21.153:8740/t/abc'
+  assert.equal(linkForAddress(v4, 'fe80::1'), 'http://[fe80::1]:8740/t/abc')
+  assert.equal(
+    linkForAddress('http://[fe80::1]:8740/t/abc', '10.0.0.7'),
+    'http://10.0.0.7:8740/t/abc',
+  )
+  assert.equal(
+    linkForAddress('http://[fe80::1]:8740/t/abc', 'fe80::2'),
+    'http://[fe80::2]:8740/t/abc',
+  )
+})
+
+test('linkForAddress leaves anything it does not understand alone', () => {
+  const url = 'http://10.40.21.153:8740/t/abc'
+  assert.equal(linkForAddress('', '10.0.0.7'), '')
+  assert.equal(linkForAddress(url, ''), url)
+  assert.equal(linkForAddress('10.40.21.153:8740/t/abc', '10.0.0.7'), '10.40.21.153:8740/t/abc')
+  // No port to keep, so there is nothing safe to rebuild.
+  assert.equal(linkForAddress('http://10.40.21.153/t/abc', '10.0.0.7'), 'http://10.40.21.153/t/abc')
+  assert.equal(linkForAddress('http://[fe80::1]/t/abc', '10.0.0.7'), 'http://[fe80::1]/t/abc')
+})
+
+test('linkForAddress reads the host and not the path after it', () => {
+  // The token is hex by construction, so this pins the anchoring rather than a
+  // reachable bug: only the authority may be rewritten.
+  assert.equal(
+    linkForAddress('http://10.40.21.153:8740/t/aa:bb/cc', '10.0.0.7'),
+    'http://10.0.0.7:8740/t/aa:bb/cc',
   )
 })
 

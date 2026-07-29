@@ -46,8 +46,36 @@ interface Bound {
       // that is there. This tool does not touch internal/tools/filedrop or
       // app_filedrop.go.
       FileDropAddresses?: () => Promise<Address[] | null>
+      // Already shipped and already bound by the Wi-Fi QR tool, and called the
+      // same way by label-maker and lan-file-drop. This tool does not touch
+      // internal/tools/qrgen or app_qrgen.go.
+      GenerateQR?: (p: QrParams) => Promise<QrCode>
     }
   }
+}
+
+/** Mirrors qrgen.Params in internal/tools/qrgen/qrgen.go. Only text mode is used here. */
+export interface QrParams {
+  mode: string
+  text: string
+  ssid: string
+  password: string
+  security: string
+  hidden: boolean
+  ecLevel: string
+}
+
+/** Mirrors qrgen.Code in internal/tools/qrgen/qrgen.go. */
+export interface QrCode {
+  size: number
+  version: number
+  ecLevel: string
+  mask: number
+  modules: boolean[]
+  quiet: number
+  payload: string
+  payloadBytes: number
+  capacity: number
 }
 
 function bound(): Bound {
@@ -73,4 +101,27 @@ export async function speedAddresses(): Promise<Address[]> {
   const fn = bound().main?.App?.FileDropAddresses
   if (!fn) return []
   return (await fn()) ?? []
+}
+
+/**
+ * The QR module matrix for the test link. Null outside the desktop app, and
+ * null rather than a throw if the encoder refuses: the link is readable as text
+ * beside it either way, so a missing code must never take the page down.
+ */
+export async function generateQr(text: string): Promise<QrCode | null> {
+  const fn = bound().main?.App?.GenerateQR
+  if (!fn) return null
+  try {
+    return await fn({
+      mode: 'text',
+      text,
+      ssid: '',
+      password: '',
+      security: '',
+      hidden: false,
+      ecLevel: '',
+    })
+  } catch {
+    return null
+  }
 }

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ArrowDownUp, Square } from 'lucide-react'
+import { ArrowDownUp, QrCode as QrCodeIcon, Square } from 'lucide-react'
 import {
   Button,
   CopyButton,
@@ -13,15 +13,22 @@ import {
 } from '../../components'
 import { formatBytes } from '../../lib/format'
 import { useJob } from '../../lib/useJob'
+// The Wi-Fi QR tool's pure renderer, imported rather than copied so there is
+// only one QR path builder in the app. Approved in Phase 4 for label-maker and
+// used again by lan-file-drop. This file is never edited.
+import { modulesToPath } from '../wifi-qr/render'
 import {
+  generateQr,
   lanSpeedSession,
   speedAddresses,
   startLanSpeed,
   type Address,
   type Pull,
+  type QrCode,
 } from './api'
 import {
   curlFor,
+  linkForAddress,
   localTime,
   mbpsText,
   pullId,
@@ -48,6 +55,8 @@ export default function LanThroughputPage() {
   const [chosenIp, setChosenIp] = useState('')
   const [jobId, setJobId] = useState<string | null>(null)
   const [url, setUrl] = useState('')
+  const [showQr, setShowQr] = useState(false)
+  const [qr, setQr] = useState<QrCode | null>(null)
 
   useEffect(() => {
     void speedAddresses().then((found) => {
@@ -134,10 +143,25 @@ export default function LanThroughputPage() {
 
   // The backend builds the link from the address it decided to offer first. When
   // the tech picks a different one, only the host part changes.
-  const shownUrl = useMemo(() => {
-    if (url === '' || chosenIp === '') return url
-    return url.replace(/\/\/[^/]+:/, `//${chosenIp.includes(':') ? `[${chosenIp}]` : chosenIp}:`)
-  }, [url, chosenIp])
+  const shownUrl = useMemo(() => linkForAddress(url, chosenIp), [url, chosenIp])
+
+  // Nothing is generated until the tech asks for the code, and the payload is
+  // the link on screen rather than the one the backend built, so picking a
+  // different address regenerates it. The guard drops a slow answer for an
+  // address that has already been changed again.
+  useEffect(() => {
+    if (!showQr || shownUrl === '') {
+      setQr(null)
+      return
+    }
+    let current = true
+    void generateQr(shownUrl).then((code) => {
+      if (current) setQr(code)
+    })
+    return () => {
+      current = false
+    }
+  }, [showQr, shownUrl])
 
   return (
     <ToolShell
@@ -244,7 +268,23 @@ export default function LanThroughputPage() {
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <CopyButton value={shownUrl} label="Copy link" />
               <CopyButton value={curlFor(shownUrl)} label="Copy curl line" />
+              <Button
+                size="sm"
+                onClick={() => setShowQr((shown) => !shown)}
+                icon={<QrCodeIcon size={14} aria-hidden />}
+              >
+                {showQr ? 'Hide QR code' : 'Show QR code'}
+              </Button>
             </div>
+            {showQr && qr !== null && (
+              <div className="mt-2 flex flex-wrap items-center gap-3">
+                <QrPanel code={qr} />
+                <p className="max-w-xs text-xs text-fg-muted">
+                  Scanning this with a phone measures the phone's wifi, not the link you are testing.
+                  Use it to get the address onto the other computer without typing it.
+                </p>
+              </div>
+            )}
             <p className="mt-2 text-xs text-fg-muted">
               Open the link, then click Start the test. The result appears here, not there.
             </p>
@@ -295,5 +335,21 @@ export default function LanThroughputPage() {
         </p>
       </div>
     </ToolShell>
+  )
+}
+
+function QrPanel({ code }: { code: QrCode }) {
+  const span = code.size + code.quiet * 2
+  return (
+    <svg
+      viewBox={`0 0 ${span} ${span}`}
+      width={180}
+      height={180}
+      role="img"
+      aria-label="QR code for the throughput test link"
+      className="shrink-0 rounded bg-white"
+    >
+      <path d={modulesToPath(code.modules, code.size, code.quiet)} fill="#000" />
+    </svg>
   )
 }
