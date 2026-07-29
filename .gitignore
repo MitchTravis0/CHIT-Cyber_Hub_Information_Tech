@@ -18,7 +18,7 @@ frontend/dist/*
 *.prof
 
 # Internal development documentation. None of it is needed to build, run, test or
-# release CH-IT: it is the roadmap, the agent handoff layer and the early planning
+# release CHIT: it is the roadmap, the agent handoff layer and the early planning
 # notes. README.md and LICENSE are the only docs a downloader or someone building
 # from source needs, and both stay tracked.
 /PLAN.md
@@ -33,6 +33,9 @@ frontend/dist/*
 /SPECS/
 # Wails scaffold boilerplate describing the build directory. Nothing reads it.
 build/README.md
+
+# demo.png is deliberately NOT ignored. README.md embeds it, so it has to be in
+# the repository or the screenshot renders as a broken image on GitHub.
 
 # testdata/ is deliberately NOT ignored. It is not documentation: the Go and
 # TypeScript suites both read those golden files, and the tree does not pass its

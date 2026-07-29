@@ -70,3 +70,35 @@ test('the results table joins cells with a real space before filtering', () => {
     'the filter haystack is no longer joined with a plain space',
   )
 })
+
+/**
+ * Two modules in one folder whose names differ only by case work perfectly on
+ * Linux and break on macOS and Windows, where the filesystem is case-insensitive
+ * by default. `disk-visualizer` shipped with `treemap.ts` beside `TreeMap.tsx`
+ * from Phase 5 until the first CI run found it: resolving `'./TreeMap'` there
+ * finds `treemap.ts` first, so the import landed on the layout module and tsc
+ * reported "has no exported member 'TreeMap'". Nothing on a Linux developer
+ * machine can reproduce that, which is why it is asserted here instead.
+ */
+test('no two modules in a folder differ only by case', () => {
+  const byFolder = new Map<string, string[]>()
+  for (const path of FILES) {
+    if (!/\.tsx?$/.test(path)) continue
+    const slash = path.lastIndexOf('/')
+    const dir = path.slice(0, slash)
+    const stem = path.slice(slash + 1).replace(/\.tsx?$/, '')
+    const key = `${dir} ${stem.toLowerCase()}`
+    byFolder.set(key, [...(byFolder.get(key) ?? []), path.slice(slash + 1)])
+  }
+  const clashes = [...byFolder.values()].filter((names) => names.length > 1)
+  assert.deepEqual(clashes, [])
+})
+
+test('the case-collision scan looks at real .ts and .tsx files', () => {
+  // A control: without this, a wrong filter would make the check above pass
+  // over an empty list.
+  const modules = FILES.filter((path) => /\.tsx?$/.test(path))
+  assert.ok(modules.length > 100, `only ${modules.length} modules found`)
+  assert.ok(modules.some((path) => path.endsWith('/disk-visualizer/layout.ts')))
+  assert.ok(modules.some((path) => path.endsWith('/disk-visualizer/TreeMap.tsx')))
+})

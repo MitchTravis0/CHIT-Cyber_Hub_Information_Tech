@@ -7,7 +7,7 @@ import {
   sharePct,
   squarify,
   type Rect,
-} from '../src/tools/disk-visualizer/treemap.ts'
+} from '../src/tools/disk-visualizer/layout.ts'
 import { largestFrom } from '../src/tools/disk-visualizer/api.ts'
 
 const SPACE: Rect = { x: 0, y: 0, w: 100, h: 62 }

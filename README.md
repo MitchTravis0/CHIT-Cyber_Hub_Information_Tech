@@ -7,11 +7,7 @@ CHIT is the set of small network and diagnostic tools an IT tech reaches for eve
 one desktop app that runs on Windows, macOS and Linux. There is nothing to install, no Python, no
 terminal, no admin rights. Every tool is built so a junior tech can use it without being told how.
 
-<!-- SCREENSHOT PLACEHOLDER: drop a capture of the home screen at docs/screenshot.png,
-     then delete this comment and uncomment the line below. -->
-<!-- ![CHIT home screen](docs/screenshot.png) -->
-
-> _Screenshot goes here._
+![The CHIT home screen: a sidebar listing every tool by category, a search box, and a ring of the eight categories](demo.png)
 
 ## Tools in this build
 

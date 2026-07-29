@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { cn, formatBytes } from '../../lib/format'
 import type { Entry } from './api'
-import { sharePct, squarify } from './treemap'
+import { sharePct, squarify } from './layout'
 
 // Six steps of the accent colour. Colour is never the only signal: every tile
 // big enough to hold text also carries its name and size, and every tile has an

@@ -13,7 +13,7 @@ import { formatBytes, formatDuration } from '../../lib/format'
 import { useJob } from '../../lib/useJob'
 import { diskScanHome, largestFrom, pickScanFolder, startDiskScan, type Entry } from './api'
 import { TreeMap } from './TreeMap'
-import { crumbLabel, crumbs, csvBase, sharePct } from './treemap'
+import { crumbLabel, crumbs, csvBase, sharePct } from './layout'
 
 export default function DiskVisualizerPage() {
   const { running, progress, results, error, done, start, cancel } = useJob<Entry>()
