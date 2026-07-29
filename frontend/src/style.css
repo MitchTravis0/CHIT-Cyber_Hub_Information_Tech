@@ -1,0 +1,191 @@
+@import "tailwindcss";
+
+/* One dark palette. The accent is the only part the user can change, and it is
+   picked with a data-accent attribute on <html> set by ThemeProvider. */
+:root {
+    color-scheme: dark;
+
+    /* Neutral dark grey, no colour cast. The page sits at #171717 and the two
+       raised layers step up from it, so a card still reads as raised without
+       the palette drifting to pure black. */
+    --surface: #171717;
+    --surface-2: #1f1f1f;
+    --surface-3: #2b2b2b;
+    --fg: #ececec;
+    --fg-muted: #9e9e9e;
+    --border: #383838;
+    --ok: #3ddc84;
+    --warn: #f5b83d;
+    --danger: #ff5d5d;
+
+    /* Red is the default, so data-accent="red" needs no rule of its own. */
+    --accent: #ff3b4b;
+    --accent-fg: #14060a;
+}
+
+/* html[...] outranks the bare :root above, so whichever accent is set wins and
+   red is the fallback when the attribute is missing. Written as html[...] and
+   not :root[...] on purpose: the CSS minifier strips a redundant :root, which
+   would drop these to the same specificity as the block above and leave the
+   accent depending on source order. */
+html[data-accent="cyan"] {
+    --accent: #22d3ee;
+    --accent-fg: #06181c;
+}
+
+html[data-accent="violet"] {
+    --accent: #a78bfa;
+    --accent-fg: #150b2e;
+}
+
+html[data-accent="amber"] {
+    --accent: #fbbf24;
+    --accent-fg: #1a1204;
+}
+
+html[data-accent="green"] {
+    --accent: #34d399;
+    --accent-fg: #04180f;
+}
+
+html[data-accent="magenta"] {
+    --accent: #f472b6;
+    --accent-fg: #2a0616;
+}
+
+/* Derived from whichever --accent won above, because a custom property is
+   substituted using the value computed on the same element. */
+:root {
+    --accent-dim: color-mix(in oklab, var(--accent) 14%, transparent);
+    --accent-glow: color-mix(in oklab, var(--accent) 45%, transparent);
+}
+
+/* Exposes the variables as utilities (bg-surface, text-fg-muted, border-border,
+   bg-accent, text-danger, bg-accent-dim). */
+@theme inline {
+    --color-surface: var(--surface);
+    --color-surface-2: var(--surface-2);
+    --color-surface-3: var(--surface-3);
+    --color-fg: var(--fg);
+    --color-fg-muted: var(--fg-muted);
+    --color-border: var(--border);
+    --color-accent: var(--accent);
+    --color-accent-fg: var(--accent-fg);
+    --color-accent-dim: var(--accent-dim);
+    --color-accent-glow: var(--accent-glow);
+    --color-ok: var(--ok);
+    --color-warn: var(--warn);
+    --color-danger: var(--danger);
+}
+
+@theme {
+    /* Sharp corners everywhere. Tool pages use the bare "rounded" utility, which
+       reads --radius, so overriding the scale here reaches them without editing
+       a single tool file. --radius-full is deliberately left alone: the status
+       dots, spinner and progress bars have to stay round. */
+    --radius: 2px;
+    --radius-xs: 2px;
+    --radius-sm: 2px;
+    --radius-md: 2px;
+    --radius-lg: 2px;
+    --radius-xl: 2px;
+
+    /* Terminal flavour for the wordmark, headings and table headers. Nothing is
+       bundled, these are all fonts the three target platforms already have. */
+    --font-display: ui-monospace, "Cascadia Code", "JetBrains Mono", "Fira Code", Consolas, monospace;
+}
+
+@layer base {
+    /* Tailwind v4 defaults borders to currentColor, which reads as an outline
+       around everything. Use the theme border colour instead. */
+    *,
+    ::after,
+    ::before {
+        border-color: var(--border);
+    }
+
+    html,
+    body,
+    #root {
+        height: 100%;
+    }
+
+    body {
+        margin: 0;
+        background-color: var(--surface);
+        color: var(--fg);
+        font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        font-size: 14px;
+    }
+
+    ::-webkit-scrollbar {
+        width: 10px;
+        height: 10px;
+    }
+
+    ::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+        background: var(--surface-3);
+        border: 2px solid transparent;
+        background-clip: content-box;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+        background: var(--accent);
+        background-clip: content-box;
+    }
+
+    ::-webkit-scrollbar-corner {
+        background: transparent;
+    }
+}
+
+@layer components {
+    /* The one focus treatment, shared through the focusRing constant in
+       components/Button.tsx. A class rather than an arbitrary Tailwind value
+       because the box-shadow has a comma in it. */
+    .focus-glow:focus-visible {
+        outline: none;
+        box-shadow:
+            0 0 0 1px var(--accent),
+            0 0 12px var(--accent-glow);
+    }
+
+    /* Signature clipped corner. Top-level panels only, never on every element. */
+    .corner-cut {
+        clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%);
+    }
+
+    /* Faint plotting grid, home page only. Two gradients, no image asset, and
+       held at roughly a third of the border colour so it reads as texture
+       rather than as lines you might mistake for content. */
+    .home-grid {
+        --grid-line: color-mix(in oklab, var(--border) 16%, transparent);
+        background-image:
+            repeating-linear-gradient(to right, var(--grid-line) 0 1px, transparent 1px 48px),
+            repeating-linear-gradient(to bottom, var(--grid-line) 0 1px, transparent 1px 48px);
+        background-position: center top;
+    }
+}
+
+/* Every transition in the app is opt-out for anyone who asked for less motion.
+   The spinner and the busy status dot are exempt: they report that work is
+   still running, so stopping them would remove information. */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    ::before,
+    ::after {
+        transition-duration: 0.01ms !important;
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+    }
+
+    .animate-spin,
+    .animate-pulse {
+        animation-duration: 1s !important;
+        animation-iteration-count: infinite !important;
+    }
+}

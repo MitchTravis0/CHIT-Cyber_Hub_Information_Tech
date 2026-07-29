@@ -1,0 +1,25 @@
+{
+  "note": "Shared golden cases for wording a clock difference. Go's ntpcheck.describeGap (which builds the sentence under the table) and the TypeScript describeOffset in frontend/src/tools/ntp-check/offset.ts (which fills the Difference column) must agree, or a row will read 7 m 12 s in one place and 7 m 13 s in the other. Go asserts describeGap(ms) == gap; TypeScript asserts describeOffset(ms) == '+' + gap and describeOffset(-ms) == '-' + gap, except for 0 which has no negative form. See SPECS/CONVENTIONS.md section 8.",
+  "cases": [
+    {"ms": 0, "gap": "0 ms"},
+    {"ms": 1, "gap": "1 ms"},
+    {"ms": 32, "gap": "32 ms"},
+    {"ms": 500, "gap": "500 ms"},
+    {"ms": 999, "gap": "999 ms"},
+    {"ms": 1000, "gap": "1 s"},
+    {"ms": 1500, "gap": "2 s"},
+    {"ms": 7000, "gap": "7 s"},
+    {"ms": 59000, "gap": "59 s"},
+    {"ms": 59499, "gap": "59 s"},
+    {"ms": 59500, "gap": "1 m 0 s"},
+    {"ms": 60000, "gap": "1 m 0 s"},
+    {"ms": 90000, "gap": "1 m 30 s"},
+    {"ms": 299999, "gap": "5 m 0 s"},
+    {"ms": 300000, "gap": "5 m 0 s"},
+    {"ms": 432000, "gap": "7 m 12 s"},
+    {"ms": 3599000, "gap": "59 m 59 s"},
+    {"ms": 3600000, "gap": "1 h 0 m 0 s"},
+    {"ms": 3672000, "gap": "1 h 1 m 12 s"},
+    {"ms": 86400000, "gap": "24 h 0 m 0 s"}
+  ]
+}

@@ -1,0 +1,131 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  WAILS_VERSION: v2.13.0
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            name: Windows
+            artifact: chit-windows-amd64
+          - os: macos-latest
+            name: macOS
+            artifact: chit-macos-universal
+          - os: ubuntu-latest
+            name: Linux
+            artifact: chit-linux-amd64
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      # 24, not 22: the frontend tests are TypeScript on Node's built-in test
+      # runner, which needs type stripping to be on by default.
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      # Arch and Ubuntu 24.04 ship webkit2gtk-4.1 only, which is why every
+      # Linux build of this app carries the webkit2_41 tag.
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential pkg-config libgtk-3-dev libwebkit2gtk-4.1-dev
+
+      - name: Install Wails
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@${{ env.WAILS_VERSION }}
+
+      # Runs before the Go steps: main.go embeds frontend/dist, so it has to
+      # exist before anything compiles.
+      - name: Build frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
+      - name: Frontend tests
+        working-directory: frontend
+        run: npm test
+
+      - name: go vet
+        run: go vet ./...
+
+      # -short skips the tests that need a real network; a CI runner has no LAN
+      # to sweep and usually no unprivileged ICMP.
+      - name: go test
+        run: go test -short ./...
+
+      - name: Build app (Windows)
+        if: runner.os == 'Windows'
+        run: wails build -clean -s -platform windows/amd64
+
+      - name: Build app (macOS)
+        if: runner.os == 'macOS'
+        run: wails build -clean -s -platform darwin/universal
+
+      - name: Build app (Linux)
+        if: runner.os == 'Linux'
+        run: wails build -clean -s -tags webkit2_41 -platform linux/amd64
+
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        run: Copy-Item build/bin/chit.exe ${{ matrix.artifact }}.exe
+
+      - name: Package (macOS)
+        if: runner.os == 'macOS'
+        run: ditto -c -k --keepParent build/bin/chit.app ${{ matrix.artifact }}.zip
+
+      - name: Package (Linux)
+        if: runner.os == 'Linux'
+        run: tar -czf ${{ matrix.artifact }}.tar.gz -C build/bin chit
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: |
+            ${{ matrix.artifact }}.exe
+            ${{ matrix.artifact }}.zip
+            ${{ matrix.artifact }}.tar.gz
+          if-no-files-found: error
+
+  release:
+    name: Release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          draft: true
+          generate_release_notes: true

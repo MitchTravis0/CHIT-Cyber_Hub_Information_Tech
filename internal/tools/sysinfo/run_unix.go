@@ -1,0 +1,30 @@
+//go:build linux || darwin
+
+package sysinfo
+
+import (
+	"context"
+	"os"
+	"os/exec"
+	"time"
+)
+
+// run executes a system tool and returns its stdout. Every caller treats a
+// failure as "this operating system did not tell us", so the error detail is
+// not needed. The argument lists are compile-time constants; no user input ever
+// reaches here.
+func run(name string, args ...string) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), commandTimeout*time.Second)
+	defer cancel()
+	out, err := exec.CommandContext(ctx, name, args...).Output()
+	return string(out), err
+}
+
+// readFile returns the contents of path, or "" when it cannot be read.
+func readFile(path string) string {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	return string(data)
+}

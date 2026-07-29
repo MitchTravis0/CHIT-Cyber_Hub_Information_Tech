@@ -1,0 +1,394 @@
+{
+  "note": "Shared golden cases for the IP range parser. internal/netscan/iprange.go and frontend/src/tools/ip-range-scanner/range.ts must agree on every one of these, error wording included. See CONVENTIONS.md.",
+  "cases": [
+    {
+      "input": "192.168.1.50",
+      "ok": true,
+      "start": "192.168.1.50",
+      "end": "192.168.1.50",
+      "count": 1,
+      "text": "192.168.1.50"
+    },
+    {
+      "input": "  10.0.0.1  ",
+      "ok": true,
+      "start": "10.0.0.1",
+      "end": "10.0.0.1",
+      "count": 1,
+      "text": "10.0.0.1"
+    },
+    {
+      "input": "192.168.1.0/24",
+      "ok": true,
+      "start": "192.168.1.1",
+      "end": "192.168.1.254",
+      "count": 254,
+      "text": "192.168.1.0/24"
+    },
+    {
+      "input": "192.168.1.77/24",
+      "ok": true,
+      "start": "192.168.1.1",
+      "end": "192.168.1.254",
+      "count": 254,
+      "text": "192.168.1.0/24"
+    },
+    {
+      "input": "10.1.2.0/30",
+      "ok": true,
+      "start": "10.1.2.1",
+      "end": "10.1.2.2",
+      "count": 2,
+      "text": "10.1.2.0/30"
+    },
+    {
+      "input": "10.1.2.0/31",
+      "ok": true,
+      "start": "10.1.2.0",
+      "end": "10.1.2.1",
+      "count": 2,
+      "text": "10.1.2.0/31"
+    },
+    {
+      "input": "10.1.2.7/32",
+      "ok": true,
+      "start": "10.1.2.7",
+      "end": "10.1.2.7",
+      "count": 1,
+      "text": "10.1.2.7/32"
+    },
+    {
+      "input": "10.0.0.0/16",
+      "ok": true,
+      "start": "10.0.0.1",
+      "end": "10.0.255.254",
+      "count": 65534,
+      "text": "10.0.0.0/16"
+    },
+    {
+      "input": "192.168.1.1-192.168.1.255",
+      "ok": true,
+      "start": "192.168.1.1",
+      "end": "192.168.1.255",
+      "count": 255,
+      "text": "192.168.1.1-192.168.1.255"
+    },
+    {
+      "input": "10.0.0.250-10.0.1.5",
+      "ok": true,
+      "start": "10.0.0.250",
+      "end": "10.0.1.5",
+      "count": 12,
+      "text": "10.0.0.250-10.0.1.5"
+    },
+    {
+      "input": "10.0.0.5-10.0.0.5",
+      "ok": true,
+      "start": "10.0.0.5",
+      "end": "10.0.0.5",
+      "count": 1,
+      "text": "10.0.0.5-10.0.0.5"
+    },
+    {
+      "input": "192.168.1.1-255",
+      "ok": true,
+      "start": "192.168.1.1",
+      "end": "192.168.1.255",
+      "count": 255,
+      "text": "192.168.1.1-192.168.1.255"
+    },
+    {
+      "input": "192.168.1.0-0",
+      "ok": true,
+      "start": "192.168.1.0",
+      "end": "192.168.1.0",
+      "count": 1,
+      "text": "192.168.1.0-192.168.1.0"
+    },
+    {
+      "input": "192.168.1.10 - 20",
+      "ok": true,
+      "start": "192.168.1.10",
+      "end": "192.168.1.20",
+      "count": 11,
+      "text": "192.168.1.10-192.168.1.20"
+    },
+    {
+      "input": "",
+      "ok": false,
+      "error": "Type something to scan, for example 192.168.1.0/24 or 192.168.1.1-254."
+    },
+    {
+      "input": "   ",
+      "ok": false,
+      "error": "Type something to scan, for example 192.168.1.0/24 or 192.168.1.1-254."
+    },
+    {
+      "input": "hello",
+      "ok": false,
+      "error": "\"hello\" is not an address CHIT understands. Try 192.168.1.0/24, 192.168.1.1-254 or 192.168.1.50."
+    },
+    {
+      "input": "192.168.1.256",
+      "ok": false,
+      "error": "\"192.168.1.256\" is not an address CHIT understands. Try 192.168.1.0/24, 192.168.1.1-254 or 192.168.1.50."
+    },
+    {
+      "input": "192.168.1",
+      "ok": false,
+      "error": "\"192.168.1\" is not an address CHIT understands. Try 192.168.1.0/24, 192.168.1.1-254 or 192.168.1.50."
+    },
+    {
+      "input": "010.1.1.1",
+      "ok": false,
+      "error": "\"010.1.1.1\" is not an address CHIT understands. Try 192.168.1.0/24, 192.168.1.1-254 or 192.168.1.50."
+    },
+    {
+      "input": "192.168.1.0/33",
+      "ok": false,
+      "error": "\"192.168.1.0/33\" is not a valid network. Use a form like 192.168.1.0/24."
+    },
+    {
+      "input": "192.168.1.0/-1",
+      "ok": false,
+      "error": "\"192.168.1.0/-1\" is not a valid network. Use a form like 192.168.1.0/24."
+    },
+    {
+      "input": "192.168.1.0/abc",
+      "ok": false,
+      "error": "\"192.168.1.0/abc\" is not a valid network. Use a form like 192.168.1.0/24."
+    },
+    {
+      "input": "192.168.1.0/04",
+      "ok": false,
+      "error": "\"192.168.1.0/04\" is not a valid network. Use a form like 192.168.1.0/24."
+    },
+    {
+      "input": "192.168.1.0/ 24",
+      "ok": false,
+      "error": "\"192.168.1.0/ 24\" is not a valid network. Use a form like 192.168.1.0/24."
+    },
+    {
+      "input": "192.168.1.0 /24",
+      "ok": false,
+      "error": "\"192.168.1.0 /24\" is not a valid network. Use a form like 192.168.1.0/24."
+    },
+    {
+      "input": "192.168.1.1/24 please",
+      "ok": false,
+      "error": "\"192.168.1.1/24 please\" is not a valid network. Use a form like 192.168.1.0/24."
+    },
+    {
+      "input": "0.0.0.0/0",
+      "ok": false,
+      "error": "That covers 4294967294 addresses. Scan at most 65536 at a time (a /16), for example 192.168.1.0/24."
+    },
+    {
+      "input": "10.0.0.0/8",
+      "ok": false,
+      "error": "That covers 16777214 addresses. Scan at most 65536 at a time (a /16), for example 192.168.1.0/24."
+    },
+    {
+      "input": "10.0.0.0/15",
+      "ok": false,
+      "error": "That covers 131070 addresses. Scan at most 65536 at a time (a /16), for example 192.168.1.0/24."
+    },
+    {
+      "input": "1.0.0.0-1.2.0.0",
+      "ok": false,
+      "error": "That covers 131073 addresses. Scan at most 65536 at a time (a /16), for example 192.168.1.0/24."
+    },
+    {
+      "input": "192.168.1.10-5",
+      "ok": false,
+      "error": "192.168.1.5 comes before 192.168.1.10, so that range is backwards. Swap the two addresses."
+    },
+    {
+      "input": "192.168.1.1-",
+      "ok": false,
+      "error": "\"192.168.1.1-\" is missing the end of the range. Try 192.168.1.1-254."
+    },
+    {
+      "input": "192.168.1.1-300",
+      "ok": false,
+      "error": "\"300\" is not a valid end for the range. Use a last number from 0 to 255, or a full address."
+    },
+    {
+      "input": "192.168.1.1-abc",
+      "ok": false,
+      "error": "\"abc\" is not a valid end for the range. Use a last number from 0 to 255, or a full address."
+    },
+    {
+      "input": "-192.168.1.5",
+      "ok": false,
+      "error": "\"-192.168.1.5\" is not an address CHIT understands. Try 192.168.1.0/24, 192.168.1.1-254 or 192.168.1.50."
+    },
+    {
+      "input": "::1",
+      "ok": false,
+      "error": "\"::1\" looks like IPv6. The scanner works on IPv4 ranges such as 192.168.1.0/24."
+    },
+    {
+      "input": "2001:db8::/64",
+      "ok": false,
+      "error": "\"2001:db8::/64\" looks like IPv6. The scanner works on IPv4 ranges such as 192.168.1.0/24."
+    },
+    {
+      "input": "fe80::1-fe80::5",
+      "ok": false,
+      "error": "\"fe80::1-fe80::5\" looks like IPv6. The scanner works on IPv4 ranges such as 192.168.1.0/24."
+    },
+    {
+      "input": "::ffff:1.2.3.4",
+      "ok": false,
+      "error": "\"::ffff:1.2.3.4\" looks like IPv6. The scanner works on IPv4 ranges such as 192.168.1.0/24."
+    },
+    {
+      "input": "192.168.1.1-192.168.1.0",
+      "ok": false,
+      "error": "192.168.1.0 comes before 192.168.1.1, so that range is backwards. Swap the two addresses."
+    },
+    {
+      "input": "1.2.3.4/32",
+      "ok": true,
+      "start": "1.2.3.4",
+      "end": "1.2.3.4",
+      "count": 1,
+      "text": "1.2.3.4/32"
+    },
+    {
+      "input": "1.2.3.4/31",
+      "ok": true,
+      "start": "1.2.3.4",
+      "end": "1.2.3.5",
+      "count": 2,
+      "text": "1.2.3.4/31"
+    },
+    {
+      "input": "255.255.255.255",
+      "ok": true,
+      "start": "255.255.255.255",
+      "end": "255.255.255.255",
+      "count": 1,
+      "text": "255.255.255.255"
+    },
+    {
+      "input": "0.0.0.0",
+      "ok": true,
+      "start": "0.0.0.0",
+      "end": "0.0.0.0",
+      "count": 1,
+      "text": "0.0.0.0"
+    },
+    {
+      "input": "192.168.001.1",
+      "ok": false,
+      "error": "\"192.168.001.1\" is not an address CHIT understands. Try 192.168.1.0/24, 192.168.1.1-254 or 192.168.1.50."
+    },
+    {
+      "input": "192.168.1.0/024",
+      "ok": false,
+      "error": "\"192.168.1.0/024\" is not a valid network. Use a form like 192.168.1.0/24."
+    },
+    {
+      "input": "192.168.1.0//24",
+      "ok": false,
+      "error": "\"192.168.1.0//24\" is not a valid network. Use a form like 192.168.1.0/24."
+    },
+    {
+      "input": "192.168.1.0/24/25",
+      "ok": false,
+      "error": "\"192.168.1.0/24/25\" is not a valid network. Use a form like 192.168.1.0/24."
+    },
+    {
+      "input": "10.0.0.1--10.0.0.5",
+      "ok": false,
+      "error": "\"10.0.0.1--10.0.0.5\" is not an address CHIT understands. Try 192.168.1.0/24, 192.168.1.1-254 or 192.168.1.50."
+    },
+    {
+      "input": "192.168.1.1-05",
+      "ok": false,
+      "error": "\"05\" is not a valid end for the range. Use a last number from 0 to 255, or a full address."
+    },
+    {
+      "input": "192.168.1.1-+5",
+      "ok": false,
+      "error": "\"+5\" is not a valid end for the range. Use a last number from 0 to 255, or a full address."
+    },
+    {
+      "input": "192.168.1.1- 20",
+      "ok": true,
+      "start": "192.168.1.1",
+      "end": "192.168.1.20",
+      "count": 20,
+      "text": "192.168.1.1-192.168.1.20"
+    },
+    {
+      "input": "192.168.1.1 -20",
+      "ok": true,
+      "start": "192.168.1.1",
+      "end": "192.168.1.20",
+      "count": 20,
+      "text": "192.168.1.1-192.168.1.20"
+    },
+    {
+      "input": "192.168.1.1--5",
+      "ok": false,
+      "error": "\"-5\" is not a valid end for the range. Use a last number from 0 to 255, or a full address."
+    },
+    {
+      "input": "192.168.1.1-0255",
+      "ok": false,
+      "error": "\"0255\" is not a valid end for the range. Use a last number from 0 to 255, or a full address."
+    },
+    {
+      "input": "192.168.1.0/32",
+      "ok": true,
+      "start": "192.168.1.0",
+      "end": "192.168.1.0",
+      "count": 1,
+      "text": "192.168.1.0/32"
+    },
+    {
+      "input": "192.168.1.0/0",
+      "ok": false,
+      "error": "That covers 4294967294 addresses. Scan at most 65536 at a time (a /16), for example 192.168.1.0/24."
+    },
+    {
+      "input": "1.2.3.4 5.6.7.8",
+      "ok": false,
+      "error": "\"1.2.3.4 5.6.7.8\" is not an address CHIT understands. Try 192.168.1.0/24, 192.168.1.1-254 or 192.168.1.50."
+    },
+    {
+      "input": "192.168.1.0/24 ",
+      "ok": true,
+      "start": "192.168.1.1",
+      "end": "192.168.1.254",
+      "count": 254,
+      "text": "192.168.1.0/24"
+    },
+    {
+      "input": "192.168.1.0/+24",
+      "ok": false,
+      "error": "\"192.168.1.0/+24\" is not a valid network. Use a form like 192.168.1.0/24."
+    },
+    {
+      "input": "10.0.0.1-10.0.0.256",
+      "ok": false,
+      "error": "\"10.0.0.1-10.0.0.256\" is not an address CHIT understands. Try 192.168.1.0/24, 192.168.1.1-254 or 192.168.1.50."
+    },
+    {
+      "input": "10.0.0.1-10.0.010.5",
+      "ok": false,
+      "error": "\"10.0.0.1-10.0.010.5\" is not an address CHIT understands. Try 192.168.1.0/24, 192.168.1.1-254 or 192.168.1.50."
+    },
+    {
+      "input": "0.0.0.1-0.1.0.0",
+      "ok": true,
+      "start": "0.0.0.1",
+      "end": "0.1.0.0",
+      "count": 65536,
+      "text": "0.0.0.1-0.1.0.0"
+    }
+  ]
+}

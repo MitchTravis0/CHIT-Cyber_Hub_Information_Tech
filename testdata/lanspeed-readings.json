@@ -1,0 +1,22 @@
+{
+  "note": "Shared golden cases for the LAN throughput reading. internal/tools/lanspeed/lanspeed.go Reading() and frontend/src/tools/lan-throughput/reading.ts speedReading() must agree on every one of these, wording included. Both sides of every threshold are present on purpose. See SPECS/CONVENTIONS.md 8.3.",
+  "cases": [
+    { "mbps": 940, "reading": "Gigabit or better." },
+    { "mbps": 742.1, "reading": "Gigabit or better." },
+    { "mbps": 700, "reading": "Gigabit or better." },
+    { "mbps": 699.9, "reading": "Fast, but short of a full gigabit link." },
+    { "mbps": 350, "reading": "Fast, but short of a full gigabit link." },
+    { "mbps": 200, "reading": "Fast, but short of a full gigabit link." },
+    { "mbps": 199.9, "reading": "About 100 Mbps. Check for a 100 Mbps switch port or a damaged cable." },
+    { "mbps": 94, "reading": "About 100 Mbps. Check for a 100 Mbps switch port or a damaged cable." },
+    { "mbps": 70, "reading": "About 100 Mbps. Check for a 100 Mbps switch port or a damaged cable." },
+    { "mbps": 69.9, "reading": "Wi-Fi speeds, or a busy link." },
+    { "mbps": 45, "reading": "Wi-Fi speeds, or a busy link." },
+    { "mbps": 20, "reading": "Wi-Fi speeds, or a busy link." },
+    { "mbps": 19.9, "reading": "Very slow for a local network. Check the cable, the port and what else is using the link." },
+    { "mbps": 3.5, "reading": "Very slow for a local network. Check the cable, the port and what else is using the link." },
+    { "mbps": 0.1, "reading": "Very slow for a local network. Check the cable, the port and what else is using the link." },
+    { "mbps": 0, "reading": "Too little was transferred to measure." },
+    { "mbps": -1, "reading": "Too little was transferred to measure." }
+  ]
+}

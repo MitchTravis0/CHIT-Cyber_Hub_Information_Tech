@@ -1,0 +1,48 @@
+# Build output
+build/bin
+/chit
+/chit.exe
+*.exe
+
+# Frontend
+node_modules
+# written by the wails CLI to decide whether npm install needs rerunning
+frontend/package.json.md5
+# dist is generated, but the directory itself must exist for the go:embed in main.go
+frontend/dist/*
+!frontend/dist/.gitkeep
+
+# Go test and profiling artifacts
+*.test
+*.out
+*.prof
+
+# Internal development documentation. None of it is needed to build, run, test or
+# release CH-IT: it is the roadmap, the agent handoff layer and the early planning
+# notes. README.md and LICENSE are the only docs a downloader or someone building
+# from source needs, and both stay tracked.
+/PLAN.md
+/CLAUDE.md
+/CONVENTIONS.md
+/prompt.md
+/design.txt
+/design-path.md
+/idea.txt
+/tools.md
+/new-tools.md
+/SPECS/
+# Wails scaffold boilerplate describing the build directory. Nothing reads it.
+build/README.md
+
+# testdata/ is deliberately NOT ignored. It is not documentation: the Go and
+# TypeScript suites both read those golden files, and the tree does not pass its
+# tests without them.
+
+# Local tool and editor settings
+.claude/
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+.idea/
+.vscode/
