@@ -96,7 +96,17 @@ func TestResolverForDialsTheGivenAddress(t *testing.T) {
 	got := make(chan string, 4)
 	wrapped := r.Dial
 	r.Dial = func(ctx context.Context, network, address string) (net.Conn, error) {
-		got <- address
+		// Non-blocking on purpose. How many times Go's resolver dials depends on
+		// the machine's DNS configuration: one attempt per search domain, per
+		// address family, per retry. A blocking send with a fixed buffer
+		// deadlocked the whole package on CI, where there are more search
+		// domains than here, and the test timed out after ten minutes rather
+		// than failing. The context cannot rescue it, because the goroutine is
+		// stuck on a channel send rather than on I/O.
+		select {
+		case got <- address:
+		default:
+		}
 		return wrapped(ctx, network, address)
 	}
 

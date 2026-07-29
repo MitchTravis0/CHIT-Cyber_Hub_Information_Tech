@@ -1,7 +1,8 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readdirSync, readFileSync, statSync } from 'node:fs'
-import { join } from 'node:path'
+import { join, sep } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 /**
  * A control byte in a TypeScript file is invisible three times over: the editor
@@ -31,7 +32,20 @@ function sourceFiles(dir: string): string[] {
   return out
 }
 
-const FILES = ROOTS.flatMap((root) => sourceFiles(new URL(root, import.meta.url).pathname))
+/**
+ * fileURLToPath, not URL.pathname: on Windows the latter yields "/D:/a/..." with
+ * a leading slash, which readdirSync cannot open, and the whole file throws
+ * before a single assertion runs. Paths are then normalised to forward slashes
+ * so the string comparisons below mean the same thing on all three platforms;
+ * join() produces backslashes on Windows.
+ */
+function scan(root: string): string[] {
+  return sourceFiles(fileURLToPath(new URL(root, import.meta.url))).map((path) =>
+    path.split(sep).join('/'),
+  )
+}
+
+const FILES = ROOTS.flatMap(scan)
 
 test('the scan actually reaches the source tree', () => {
   // Without this, a wrong path would make every check below pass over nothing.
