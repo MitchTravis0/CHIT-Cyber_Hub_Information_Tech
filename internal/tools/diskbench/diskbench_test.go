@@ -599,3 +599,62 @@ func TestWriteIsFlushedAndTheCacheHintIsRight(t *testing.T) {
 		t.Error("the Windows read no longer opens the handle unbuffered")
 	}
 }
+
+// TestGroupRate drives the branch a nanosecond clock can never reach. Windows'
+// monotonic clock is coarse, commonly around 15 ms, so a block group on a fast
+// drive finishes inside one tick and measures as zero elapsed time. CI found
+// this by failing: two write samples came back with no rate at all, which the
+// UI would draw as the drive stalling to 0 MB/s when it had done the opposite.
+func TestGroupRate(t *testing.T) {
+	const mib = 1 << 20
+	tests := []struct {
+		name       string
+		groupBytes int64
+		elapsed    float64
+		doneBytes  int64
+		sinceStart float64
+		last       bool
+		wantMBps   float64
+		wantOK     bool
+	}{
+		{"a measured group reports its own rate", 100 * mib, 0.5, 200 * mib, 1, false, 209.7152, true},
+		{"the last group reports its own rate too", 100 * mib, 0.5, 200 * mib, 1, true, 209.7152, true},
+		// The case CI hit: too fast for the clock, and not the last group.
+		{"an unmeasurable group is held open", 4 * mib, 0, 64 * mib, 0.25, false, 0, false},
+		// The last group must still be emitted, because its sample carries the
+		// final byte count, so it falls back to the rate for the phase so far.
+		{"an unmeasurable last group falls back to the phase rate", 4 * mib, 0, 64 * mib, 0.25, true, 268.435456, true},
+		{"a negative elapsed is treated as unmeasurable", 4 * mib, -0.001, 64 * mib, 0.25, false, 0, false},
+		{"a group with no bytes is held open", 0, 0.5, 64 * mib, 0.25, false, 0, false},
+		// Nothing measurable anywhere. Reporting 0 is honest here: there is no
+		// rate to be had, and holding the last group open would lose the sample.
+		{"an unmeasurable phase on the last group", 4 * mib, 0, 64 * mib, 0, true, 0, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mbps, ok := groupRate(tt.groupBytes, tt.elapsed, tt.doneBytes, tt.sinceStart, tt.last)
+			if ok != tt.wantOK {
+				t.Errorf("ok = %v, want %v", ok, tt.wantOK)
+			}
+			if math.Abs(mbps-tt.wantMBps) > 1e-6 {
+				t.Errorf("mbps = %v, want %v", mbps, tt.wantMBps)
+			}
+		})
+	}
+}
+
+// A group that is held open must never be reported, and one that is reported
+// must never carry a zero rate unless nothing at all could be timed.
+func TestGroupRateNeverReportsAZeroRateItCouldAvoid(t *testing.T) {
+	for _, elapsed := range []float64{0, -1, 1e-9, 0.001, 1} {
+		for _, last := range []bool{false, true} {
+			mbps, ok := groupRate(1<<20, elapsed, 64<<20, 0.25, last)
+			if ok && mbps <= 0 {
+				t.Errorf("elapsed %v last %v: reported %v MB/s, which the chart draws as a stall", elapsed, last, mbps)
+			}
+			if !ok && last {
+				t.Errorf("elapsed %v: the last group was held open, so its byte count is lost", elapsed)
+			}
+		}
+	}
+}

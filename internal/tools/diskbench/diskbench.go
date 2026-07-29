@@ -301,11 +301,16 @@ func writePass(ctx context.Context, path string, total int64, sizeMB int, out Si
 
 		if (block+1)%group == 0 || written >= total {
 			now := time.Now()
+			mbps, ok := groupRate(groupBytes, now.Sub(groupStart).Seconds(),
+				written, now.Sub(started).Seconds(), written >= total)
+			if !ok {
+				continue
+			}
 			out.Emit(Sample{
 				Phase:   PhaseWrite,
 				Bytes:   written,
 				Seconds: now.Sub(started).Seconds(),
-				MBps:    rate(groupBytes, now.Sub(groupStart).Seconds()),
+				MBps:    mbps,
 			})
 			out.Progress(int(written>>20), "Writing "+strconv.Itoa(sizeMB)+" MB to "+filepath.Dir(path))
 			groupStart = now
@@ -362,11 +367,16 @@ func readPass(ctx context.Context, path string, total int64, sizeMB int, out Sin
 
 		if (block+1)%group == 0 || read >= total {
 			now := time.Now()
+			mbps, ok := groupRate(groupBytes, now.Sub(groupStart).Seconds(),
+				read, now.Sub(started).Seconds(), read >= total)
+			if !ok {
+				continue
+			}
 			out.Emit(Sample{
 				Phase:   PhaseRead,
 				Bytes:   read,
 				Seconds: now.Sub(started).Seconds(),
-				MBps:    rate(groupBytes, now.Sub(groupStart).Seconds()),
+				MBps:    mbps,
 			})
 			out.Progress(sizeMB+int(read>>20), "Reading it back")
 			groupStart = now
@@ -378,6 +388,28 @@ func readPass(ctx context.Context, path string, total int64, sizeMB int, out Sin
 }
 
 // rate is megabytes per second for one block group.
+// groupRate decides what a finished block group reports. ok is false when the
+// group measured no elapsed time and is not the last one: Windows' monotonic
+// clock is coarse (commonly around 15 ms), so a group on a fast drive can
+// finish inside a single tick, and reporting that as 0 MB/s would draw a
+// dropout on the chart the drive never had. The caller keeps the group open and
+// accumulates instead. The final group is always reported, because its sample
+// carries the whole byte count, and falls back to the rate for the phase so far
+// when the group itself is too fast to time.
+//
+// Linux and macOS have a nanosecond clock and never reach the ok == false path,
+// which is why this is a separate function with its own table test: CI on
+// Windows is the only thing that ever exercised it, and it did so by failing.
+func groupRate(groupBytes int64, elapsed float64, doneBytes int64, sinceStart float64, last bool) (float64, bool) {
+	if measured := rate(groupBytes, elapsed); measured > 0 {
+		return measured, true
+	}
+	if !last {
+		return 0, false
+	}
+	return rate(doneBytes, sinceStart), true
+}
+
 func rate(bytes int64, seconds float64) float64 {
 	if seconds <= 0 || bytes <= 0 {
 		return 0
