@@ -211,7 +211,15 @@ func TestWalkMinSize(t *testing.T) {
 }
 
 func TestSkipPathExactMatchOnly(t *testing.T) {
+	// Written with forward slashes and converted, because skipPath runs the
+	// input through filepath.Clean: on Windows "/proc" cleans to "\proc" and
+	// would never equal a root spelled with a forward slash. Converting both
+	// sides keeps one table meaningful on all three platforms rather than
+	// making this a Unix-only test.
 	roots := []string{"/proc", "/sys", "/dev", "/run"}
+	for i, root := range roots {
+		roots[i] = filepath.FromSlash(root)
+	}
 
 	tests := []struct {
 		name string
@@ -229,8 +237,9 @@ func TestSkipPathExactMatchOnly(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := skipPath(tt.dir, roots); got != tt.want {
-				t.Errorf("skipPath(%q) = %v, want %v", tt.dir, got, tt.want)
+			dir := filepath.FromSlash(tt.dir)
+			if got := skipPath(dir, roots); got != tt.want {
+				t.Errorf("skipPath(%q) = %v, want %v", dir, got, tt.want)
 			}
 		})
 	}

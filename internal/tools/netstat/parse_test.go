@@ -3,6 +3,7 @@ package netstat
 import (
 	"encoding/json"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"testing"
@@ -300,9 +301,22 @@ func TestServiceName(t *testing.T) {
 	}
 }
 
-// TestServiceNamesMatchEtcServices checks the port numbers against this
-// machine's IANA-sourced /etc/services, which is an independent list. It is
-// skipped where that file does not exist rather than being a Linux-only test.
+// TestServiceNamesMatchEtcServices cross-checks the port numbers against this
+// machine's /etc/services, which is an independent list. Skipped where the file
+// does not exist (Windows) rather than being a Linux-only test.
+//
+// Presence confirms a number is not invented. **Absence proves nothing**, and
+// the original version of this test got that backwards: it required every port
+// to appear, which held on an Arch machine carrying the full IANA list and
+// failed CI on both other platforms. Ubuntu's trimmed copy omits 9100
+// (HP JetDirect raw printing, which the Raw Printer Test tool is built around),
+// 27017, 3128, 5900, 1723, 1900, 3268, 8443 and 1521; macOS omits 27017 and
+// 6379. Every one of those is correct and widely known, so failing on them was
+// asserting a property of the host, not of this package.
+//
+// The exact names and the count of all 54 entries are pinned by the literal
+// table in TestServiceName above, which needs no host file. This test is the
+// bonus cross-check, with a floor so it cannot pass vacuously.
 func TestServiceNamesMatchEtcServices(t *testing.T) {
 	data, err := os.ReadFile("/etc/services")
 	if err != nil {
@@ -322,15 +336,26 @@ func TestServiceNamesMatchEtcServices(t *testing.T) {
 			known[port] = true
 		}
 	}
-	missing := []int{}
+	confirmed, missing := 0, []int{}
 	for port := range services {
-		if !known[port] {
-			missing = append(missing, port)
+		if known[port] {
+			confirmed++
+			continue
 		}
+		missing = append(missing, port)
 	}
-	if len(missing) > 0 {
-		t.Errorf("%d ports are not in /etc/services at all: %v", len(missing), missing)
+	sort.Ints(missing)
+
+	// The floor is what stops this passing over nothing: a file that confirms
+	// almost none of our ports is not an oracle, it is a stub, and the skip
+	// above only catches the file being absent entirely. 30 of 54 is comfortably
+	// below what any real services file provides and far above a stub.
+	if confirmed < 30 {
+		t.Skipf("only %d of %d ports appear in this machine's /etc/services, which is too trimmed to check against",
+			confirmed, len(services))
 	}
+	t.Logf("%d of %d ports confirmed against /etc/services; not listed on this machine: %v",
+		confirmed, len(services), missing)
 }
 
 func TestSortEntries(t *testing.T) {

@@ -771,8 +771,13 @@ func TestPortInUseRejectsBeforeTheJobStarts(t *testing.T) {
 	dir := t.TempDir()
 	path := write(t, dir, "a.txt", []byte("x"))
 
-	// Take a port, then ask for it.
-	blocker, err := net.Listen("tcp", "127.0.0.1:0")
+	// Take a port, then ask for it. The blocker binds every interface because
+	// that is what serve.go does (":port"). Binding only 127.0.0.1 here made
+	// this pass on Linux, which refuses the overlapping wildcard bind, and fail
+	// on macOS and Windows, which correctly allow a wildcard bind alongside a
+	// loopback-only one. That was the test being wrong about the product, not
+	// the product being wrong.
+	blocker, err := net.Listen("tcp", ":0")
 	if err != nil {
 		t.Fatal(err)
 	}
