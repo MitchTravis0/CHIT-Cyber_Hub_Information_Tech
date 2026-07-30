@@ -90,6 +90,10 @@ export function FileDropSession(arg1) {
   return window['go']['main']['App']['FileDropSession'](arg1);
 }
 
+export function FirewallHint(arg1, arg2) {
+  return window['go']['main']['App']['FirewallHint'](arg1, arg2);
+}
+
 export function GenerateCSR(arg1) {
   return window['go']['main']['App']['GenerateCSR'](arg1);
 }
@@ -210,6 +214,10 @@ export function RemoveTOTPAccount(arg1) {
   return window['go']['main']['App']['RemoveTOTPAccount'](arg1);
 }
 
+export function RestartForUpdate() {
+  return window['go']['main']['App']['RestartForUpdate']();
+}
+
 export function ScanDefaults() {
   return window['go']['main']['App']['ScanDefaults']();
 }
@@ -248,6 +256,10 @@ export function StartFileHash(arg1) {
 
 export function StartIPScan(arg1) {
   return window['go']['main']['App']['StartIPScan'](arg1);
+}
+
+export function StartInstallUpdate() {
+  return window['go']['main']['App']['StartInstallUpdate']();
 }
 
 export function StartInternetTriage(arg1) {

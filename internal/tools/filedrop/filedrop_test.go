@@ -8,6 +8,7 @@ import (
 	"mime/multipart"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -329,6 +330,75 @@ func TestTokenIsRandom(t *testing.T) {
 	}
 }
 
+// Every link on the served page is followed the way a browser follows it:
+// resolved against the URL of the page it is on, which is what a bare "f/0"
+// relative to "/d/<token>" gets wrong. Reported from a real drop between two
+// machines on 2026-07-29: the page listed the file, clicking it said
+// "Nothing here." and saved that 14 byte 404 body as the download.
+//
+// The whole package's route tests requested absolute paths they built
+// themselves, so every one of them passed while no link on the page worked.
+func TestServedLinksResolveTheWayABrowserResolvesThem(t *testing.T) {
+	dir := t.TempDir()
+	content := []byte("the actual bytes of the shared file")
+	path := write(t, dir, "driver.txt", content)
+
+	base, token, _, stop := live(t, options{
+		shares:      []Share{{Path: path, Name: "driver.txt", Bytes: int64(len(content))}},
+		allowUpload: true,
+		receiveDir:  dir,
+		uploadLimit: 1 << 20,
+	})
+	defer stop()
+
+	// This is the address the tech reads out, with no trailing slash, exactly
+	// as URLFor builds it and as the page and the QR code show it.
+	pageURL := base + "/d/" + token
+	resp, body := get(t, pageURL)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("index status = %d, want 200", resp.StatusCode)
+	}
+
+	pageRef, err := url.Parse(pageURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	hrefs := regexp.MustCompile(`(?:href|action)="([^"]+)"`).FindAllStringSubmatch(string(body), -1)
+	if len(hrefs) != 2 {
+		t.Fatalf("found %d links on the page, want 2 (one file, one upload form)", len(hrefs))
+	}
+
+	for _, match := range hrefs {
+		ref, err := url.Parse(match[1])
+		if err != nil {
+			t.Fatalf("link %q does not parse: %v", match[1], err)
+		}
+		// net/url's ResolveReference is RFC 3986 reference resolution, which is
+		// what every browser does with a relative href.
+		resolved := pageRef.ResolveReference(ref)
+		if !strings.HasPrefix(resolved.Path, "/d/"+token+"/") {
+			t.Errorf("link %q on page %q resolves to %q, which is outside this session's path and gets the flat 404",
+				match[1], pageURL, resolved.Path)
+		}
+	}
+
+	// And prove it end to end for the file link, which is the one the report was
+	// about: follow it and the bytes must arrive.
+	fileRef, err := url.Parse(hrefs[0][1])
+	if err != nil {
+		t.Fatal(err)
+	}
+	fileResp, got := get(t, pageRef.ResolveReference(fileRef).String())
+	if fileResp.StatusCode != http.StatusOK {
+		t.Fatalf("following the file link gave %d and a %d byte body (%q), want the file",
+			fileResp.StatusCode, len(got), string(got))
+	}
+	if !bytes.Equal(got, content) {
+		t.Errorf("following the file link returned %q, want %q", got, content)
+	}
+}
+
 func TestIndexHTMLIsSelfContained(t *testing.T) {
 	out := IndexHTML("abc", []Share{{Name: "a.txt", Bytes: 10}}, true)
 
@@ -359,6 +429,21 @@ func TestIndexHTMLEscapes(t *testing.T) {
 	if !strings.Contains(out, "&lt;script&gt;") {
 		t.Error("the file name was not escaped at all")
 	}
+
+	// The token goes into every href and the form action. It is hex by
+	// construction, so this pins the escaping rather than a reachable bug, and
+	// until 2026-07-29 it pinned nothing at all: IndexHTML took the token and
+	// never rendered it, so this test passed over an empty claim.
+	nasty := IndexHTML(`a"><script>alert(1)</script>`, []Share{{Name: "a.txt"}}, true)
+	if strings.Count(nasty, "<script") != 0 {
+		t.Error("a token injected a script tag into the served page")
+	}
+	// This literal was produced by running IndexHTML once and pasting what it
+	// printed, not written from memory: url.PathEscape escapes "/" as %2F here,
+	// which a hand-written guess got wrong on the first attempt.
+	if !strings.Contains(nasty, `href="/d/a%22%3E%3Cscript%3Ealert%281%29%3C%2Fscript%3E/f/0"`) {
+		t.Error("the token was not escaped into the href as expected")
+	}
 }
 
 func TestIndexHTMLUploadFormOnlyWhenAllowed(t *testing.T) {
@@ -368,7 +453,9 @@ func TestIndexHTMLUploadFormOnlyWhenAllowed(t *testing.T) {
 	}
 
 	on := IndexHTML("abc", []Share{{Name: "a.txt"}}, true)
-	if !strings.Contains(on, `<form method="post" action="up" enctype="multipart/form-data">`) {
+	// The action is absolute and token-scoped. It read action="up" until
+	// 2026-07-29, which a browser resolves to /d/up and the server 404s.
+	if !strings.Contains(on, `<form method="post" action="/d/abc/up" enctype="multipart/form-data">`) {
 		t.Error("the upload form is missing or has the wrong shape")
 	}
 	if !strings.Contains(on, `name="file"`) {
@@ -399,12 +486,20 @@ func TestIndexHTMLLinksEveryShareByIndex(t *testing.T) {
 	out := IndexHTML("abc", shares, false)
 
 	for i := range shares {
-		if !strings.Contains(out, `href="f/`+strconv.Itoa(i)+`"`) {
+		// Absolute and token-scoped, written out in full rather than built from
+		// the same expression the page uses: a relative "f/N" is what shipped
+		// for four phases and no test noticed.
+		if !strings.Contains(out, `href="/d/abc/f/`+strconv.Itoa(i)+`"`) {
 			t.Errorf("no link to index %d", i)
 		}
 	}
-	if strings.Contains(out, `href="f/3"`) {
+	if strings.Contains(out, `href="/d/abc/f/3"`) {
 		t.Error("the page links to an index that does not exist")
+	}
+	// A bare relative link is the defect itself, so it must not come back in
+	// any form.
+	if strings.Contains(out, `href="f/`) {
+		t.Error(`a link is relative ("f/N"), which a browser resolves to /d/f/N and the server 404s`)
 	}
 }
 
@@ -825,6 +920,80 @@ func TestAddressesExcludesLoopbackAndLinkLocal(t *testing.T) {
 		}
 		if got := usableForSharing(ip); got != tt.want {
 			t.Errorf("usableForSharing(%s) = %v, want %v", tt.ip, got, tt.want)
+		}
+	}
+}
+
+// Reported from real use on 2026-07-29: a machine running Docker offered
+// 172.17.0.1 as the address to read out, which nothing else on the network can
+// reach. The page builds its link from addrs[0] and most techs never open the
+// picker, so the order is the feature.
+func TestOrderForSharingKeepsVirtualAdaptersOffTheTop(t *testing.T) {
+	// The order the operating system happened to list them in, docker first.
+	addrs := []Address{
+		{IP: "172.17.0.1", Adapter: "docker0"},
+		{IP: "192.168.1.20", Adapter: "eth0"},
+		{IP: "10.8.0.3", Adapter: "tun0"},
+		{IP: "192.168.1.21", Adapter: "wlan0"},
+	}
+	orderForSharing(addrs)
+
+	if addrs[0].IP != "192.168.1.20" {
+		t.Errorf("first address = %s (%s), want the eth0 LAN address",
+			addrs[0].IP, addrs[0].Adapter)
+	}
+	// Stable within a rank: eth0 came before wlan0 and must stay that way.
+	if addrs[1].IP != "192.168.1.21" {
+		t.Errorf("second address = %s, want the wlan0 address; the sort is not stable", addrs[1].IP)
+	}
+	// Both virtual ones sink, in their original relative order.
+	if addrs[2].Adapter != "docker0" || addrs[3].Adapter != "tun0" {
+		t.Errorf("virtual adapters ended up as %s then %s", addrs[2].Adapter, addrs[3].Adapter)
+	}
+	// Nothing may be dropped: the tech must still be able to pick docker if
+	// that really is where the other machine is.
+	if len(addrs) != 4 {
+		t.Fatalf("orderForSharing returned %d addresses, want all 4 kept", len(addrs))
+	}
+}
+
+func TestOrderForSharingAlwaysPutsThePrimaryFirst(t *testing.T) {
+	// A Hyper-V bridge that really is the way out. Primary outranks "looks
+	// virtual", or this rule would break the machines it is meant to help.
+	addrs := []Address{
+		{IP: "192.168.1.20", Adapter: "Ethernet"},
+		{IP: "172.20.5.4", Adapter: "vEthernet (External)", Primary: true},
+	}
+	orderForSharing(addrs)
+	if addrs[0].IP != "172.20.5.4" {
+		t.Errorf("first address = %s, want the primary one even though it looks virtual", addrs[0].IP)
+	}
+}
+
+func TestVirtualAdapter(t *testing.T) {
+	tests := []struct {
+		name string
+		want bool
+	}{
+		// Real adapters, on all three platforms. None of these may be demoted.
+		{"eth0", false}, {"enp3s0", false}, {"wlan0", false}, {"wlp2s0", false},
+		{"en0", false}, {"Ethernet", false}, {"Wi-Fi", false},
+		{"Local Area Connection", false}, {"Ethernet 2", false},
+		// A plain bridge on a server is doing real work; only Docker's
+		// "br-<hash>" form is demoted.
+		{"br0", false},
+		// Containers and hypervisors.
+		{"docker0", true}, {"br-9f2c1a4b", true}, {"veth6a1b2c3", true},
+		{"virbr0", true}, {"vboxnet0", true}, {"vmnet8", true},
+		{"vEthernet (Default Switch)", true}, {"vEthernet (WSL)", true},
+		{"VMware Network Adapter VMnet8", true}, {"VirtualBox Host-Only Network", true},
+		// Tunnels.
+		{"tun0", true}, {"tap0", true}, {"wg0", true}, {"utun3", true},
+		{"zt5u4hjkl2", true}, {"tailscale0", true},
+	}
+	for _, tt := range tests {
+		if got := virtualAdapter(tt.name); got != tt.want {
+			t.Errorf("virtualAdapter(%q) = %v, want %v", tt.name, got, tt.want)
 		}
 	}
 }

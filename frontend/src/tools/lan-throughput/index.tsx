@@ -18,11 +18,13 @@ import { useJob } from '../../lib/useJob'
 // used again by lan-file-drop. This file is never edited.
 import { modulesToPath } from '../wifi-qr/render'
 import {
+  firewallHint,
   generateQr,
   lanSpeedSession,
   speedAddresses,
   startLanSpeed,
   type Address,
+  type FirewallHint,
   type Pull,
   type QrCode,
 } from './api'
@@ -57,6 +59,7 @@ export default function LanThroughputPage() {
   const [url, setUrl] = useState('')
   const [showQr, setShowQr] = useState(false)
   const [qr, setQr] = useState<QrCode | null>(null)
+  const [wall, setWall] = useState<FirewallHint | null>(null)
 
   useEffect(() => {
     void speedAddresses().then((found) => {
@@ -73,6 +76,10 @@ export default function LanThroughputPage() {
     void lanSpeedSession(jobId).then((session) => {
       if (session === null || session.url === '') return
       setUrl(session.url)
+      // A firewall dropping the other machine's packets produces no error at
+      // either end, so a session where nothing pulls looks identical to one
+      // that is blocked.
+      void firewallHint(session.port, 'tcp').then(setWall)
     })
   }, [jobId])
 
@@ -84,6 +91,7 @@ export default function LanThroughputPage() {
     }
     setPortError(null)
     setUrl('')
+    setWall(null)
     await start(async () => {
       const id = await startLanSpeed({ port: parsed.port, sizeMb: Number(sizeMb) })
       setJobId(id)
@@ -303,6 +311,16 @@ export default function LanThroughputPage() {
               This port is open to the whole network while the test is running. Press Stop when you
               are done.
             </p>
+            {wall !== null && wall.message !== '' && (
+              <div className="rounded border border-warn bg-warn/10 px-3 py-2">
+                <p className="text-sm text-fg">{wall.message}</p>
+                {wall.command !== '' && (
+                  <div className="mt-2">
+                    <CopyButton value={wall.command} label="Copy the command" />
+                  </div>
+                )}
+              </div>
+            )}
           </>
         )}
 

@@ -20,11 +20,13 @@ import { modulesToPath } from '../wifi-qr/render'
 import {
   fileDropAddresses,
   fileDropSession,
+  firewallHint,
   generateQr,
   pickDropFiles,
   pickDropFolder,
   startFileDrop,
   type Address,
+  type FirewallHint,
   type QrCode,
   type Session,
   type Transfer,
@@ -61,6 +63,7 @@ export default function LanFileDropPage() {
   const [session, setSession] = useState<Session | null>(null)
   const [showQr, setShowQr] = useState(true)
   const [qr, setQr] = useState<QrCode | null>(null)
+  const [wall, setWall] = useState<FirewallHint | null>(null)
 
   useEffect(() => {
     void fileDropAddresses().then((found) => {
@@ -77,6 +80,11 @@ export default function LanFileDropPage() {
     void fileDropSession(jobId).then((found) => {
       if (found === null || found.url === '') return
       setSession(found)
+      // A firewall dropping the other machine's packets produces no error at
+      // either end, so without this the page cannot tell "blocked" from
+      // "nobody has tried yet". Asked for once per session, on the port that
+      // was actually opened.
+      void firewallHint(found.port, 'tcp').then(setWall)
     })
   }, [jobId])
 
@@ -119,6 +127,7 @@ export default function LanFileDropPage() {
     }
     setPortError(null)
     setSession(null)
+    setWall(null)
 
     await start(async () => {
       const id = await startFileDrop({
@@ -297,6 +306,23 @@ export default function LanFileDropPage() {
           </div>
         </details>
 
+        {/* Always visible, and outside the collapsed options, because on a
+            machine running Docker or a hypervisor the offered address is often
+            the wrong one and the tech needs to fix it before reading anything
+            out. It stays enabled while sharing: the link and the QR code below
+            follow it live, so switching adapter does not mean stopping. */}
+        {addressOptions.length > 1 && (
+          <div className="max-w-sm">
+            <Select
+              label="Address to share on"
+              options={addressOptions}
+              value={chosenIp}
+              onChange={(event) => setChosenIp(event.target.value)}
+              hint="The address the other machine will open. Pick your wifi or cable adapter, not a virtual one."
+            />
+          </div>
+        )}
+
         <div className="flex flex-wrap items-center gap-2">
           <Button
             variant="primary"
@@ -326,17 +352,6 @@ export default function LanFileDropPage() {
         {running && url !== '' && (
           <div className="flex flex-wrap items-center gap-4 rounded border border-accent bg-surface-2 px-3 py-3">
             <div className="min-w-56 flex-1">
-              {addressOptions.length > 1 && (
-                <div className="mb-2 max-w-xs">
-                  <Select
-                    label="Address to show"
-                    options={addressOptions}
-                    value={chosenIp}
-                    onChange={(event) => setChosenIp(event.target.value)}
-                    hint="A laptop on wifi and a cable at once has two; only one reaches the other machine."
-                  />
-                </div>
-              )}
               <p className="font-mono text-lg break-all text-fg">{url}</p>
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 <CopyButton value={url} label="Copy link" />
@@ -355,6 +370,17 @@ export default function LanFileDropPage() {
               </p>
             </div>
             {showQr && qr !== null && <QrPanel code={qr} />}
+          </div>
+        )}
+
+        {running && wall !== null && wall.message !== '' && (
+          <div className="rounded border border-warn bg-warn/10 px-3 py-2">
+            <p className="text-sm text-fg">{wall.message}</p>
+            {wall.command !== '' && (
+              <div className="mt-2">
+                <CopyButton value={wall.command} label="Copy the command" />
+              </div>
+            )}
           </div>
         )}
 

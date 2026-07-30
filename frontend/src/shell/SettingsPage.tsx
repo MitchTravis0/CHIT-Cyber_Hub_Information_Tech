@@ -1,8 +1,16 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
-import { Button, SidebarToggle } from '../components'
-import { cn, errorMessage } from '../lib/format'
+import { Button, ProgressBar, SidebarToggle } from '../components'
+import { cn, errorMessage, formatBytes } from '../lib/format'
+import { useJob } from '../lib/useJob'
 import { BrowserOpenURL } from '../../wailsjs/runtime/runtime'
-import { checkForUpdate, getAppInfo, type AppInfo, type UpdateResult } from './bindings'
+import {
+  checkForUpdate,
+  getAppInfo,
+  restartForUpdate,
+  startInstallUpdate,
+  type AppInfo,
+  type UpdateResult,
+} from './bindings'
 import { Icon } from './Icon'
 import { MOD_LABEL } from './nav'
 import { ACCENTS, useTheme } from './ThemeProvider'
@@ -13,7 +21,9 @@ export function SettingsPage({ onShowTour }: { onShowTour: () => void }) {
   const [update, setUpdate] = useState<UpdateResult | null>(null)
   const [updateError, setUpdateError] = useState<string>()
   const [checking, setChecking] = useState(false)
+  const [restartError, setRestartError] = useState<string>()
   const accentGroup = useRef<HTMLDivElement>(null)
+  const install = useJob<never>()
 
   const onCheck = async () => {
     setChecking(true)
@@ -27,6 +37,30 @@ export function SettingsPage({ onShowTour }: { onShowTour: () => void }) {
       setChecking(false)
     }
   }
+
+  const onInstall = () => {
+    void install.start(() => startInstallUpdate())
+  }
+
+  const onRestart = async () => {
+    try {
+      await restartForUpdate()
+    } catch (err) {
+      setRestartError(errorMessage(err))
+    }
+  }
+
+  // The install carries on if the tech navigates away, but this page is the
+  // only one showing its progress, so the summary note says what happened.
+  const installedNote =
+    install.done && !install.done.cancelled && typeof install.done.summary.note === 'string'
+      ? install.done.summary.note
+      : null
+
+  const installProgressLabel =
+    install.progress.total > 0
+      ? `${install.progress.message} (${formatBytes(install.progress.done)} of ${formatBytes(install.progress.total)})`
+      : install.progress.message
 
   // A radio group is one stop on the Tab key, and the arrows move inside it.
   // Without this all six swatches sit in the tab order and a keyboard user has
@@ -178,12 +212,12 @@ export function SettingsPage({ onShowTour }: { onShowTour: () => void }) {
         </Row>
         <Row
           label="Updates"
-          hint="CHIT only asks GitHub when you press this button, and it never updates itself. If a newer version exists you download the file and replace this one."
+          hint="CHIT only asks GitHub when you press this button, never on its own. If a newer version exists you can install it from right here; nothing is downloaded until you press Install."
         >
           <div className="flex flex-col items-start gap-2">
             <Button
               onClick={onCheck}
-              disabled={checking}
+              disabled={checking || install.running}
               icon={<Icon name={checking ? 'LoaderCircle' : 'RefreshCw'} size={14} aria-hidden />}
             >
               {checking ? 'Checking...' : 'Check for updates'}
@@ -194,13 +228,68 @@ export function SettingsPage({ onShowTour }: { onShowTour: () => void }) {
               </p>
             )}
             {update && (
-              <div className="text-xs leading-relaxed text-fg-muted">
+              <div className="flex flex-col items-start gap-1.5 text-xs leading-relaxed text-fg-muted">
                 <p className={cn(update.newer && 'text-fg')}>{update.note}</p>
-                {update.newer && (
+                {update.newer && !update.canInstall && update.installNote !== '' && (
+                  <p>{update.installNote}</p>
+                )}
+                {update.newer && update.canInstall && !install.running && install.done === null && (
+                  <>
+                    <Button
+                      variant="primary"
+                      onClick={onInstall}
+                      icon={<Icon name="Download" size={14} aria-hidden />}
+                    >
+                      Install version {update.latest}
+                    </Button>
+                    <p>
+                      Downloads {update.assetName} ({formatBytes(update.assetSize)}), checks it
+                      against the checksum the release publishes, and replaces this copy of CHIT.
+                      Nothing changes if any step fails.
+                    </p>
+                  </>
+                )}
+                {install.running && (
+                  <div className="flex w-full flex-col items-start gap-1.5">
+                    <ProgressBar
+                      value={install.progress.done}
+                      max={install.progress.total}
+                      label={installProgressLabel}
+                    />
+                    <Button variant="danger" onClick={install.cancel}>
+                      Cancel
+                    </Button>
+                  </div>
+                )}
+                {install.error && (
+                  <p role="alert" className="text-danger">
+                    {install.error}
+                  </p>
+                )}
+                {install.done && install.done.cancelled && (
+                  <p>The install was stopped. Nothing was changed.</p>
+                )}
+                {installedNote && (
+                  <>
+                    <p className="text-fg">{installedNote}</p>
+                    <Button
+                      onClick={onRestart}
+                      icon={<Icon name="RotateCw" size={14} aria-hidden />}
+                    >
+                      Restart CHIT now
+                    </Button>
+                    {restartError && (
+                      <p role="alert" className="text-danger">
+                        {restartError}
+                      </p>
+                    )}
+                  </>
+                )}
+                {update.newer && installedNote === null && (
                   <button
                     type="button"
                     onClick={() => BrowserOpenURL(update.url)}
-                    className="focus-glow mt-1 rounded text-accent underline underline-offset-2"
+                    className="focus-glow rounded text-accent underline underline-offset-2"
                   >
                     Open the download page
                     {update.published !== '' && ` (released ${update.published})`}

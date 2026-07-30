@@ -2,6 +2,7 @@ package filedrop
 
 import (
 	"html"
+	"net/url"
 	"strconv"
 	"strings"
 )
@@ -20,6 +21,19 @@ import (
 func IndexHTML(token string, shares []Share, allowUpload bool) string {
 	var b strings.Builder
 
+	// Every link below is absolute and carries the token. A relative "f/0"
+	// resolves against the *directory* of the current URL, and this page is
+	// served at "/d/<token>" with no trailing slash, so a browser asks for
+	// "/d/f/0", which parses "f" as the token and gets the flat 404. That is
+	// what shipped from Phase 5 until 2026-07-29, when a real drop between two
+	// machines listed the file, said "Nothing here." on the click, and saved the
+	// 14 byte 404 body as the download. The token parameter had been accepted
+	// and never used, which Go does not warn about for a function parameter.
+	//
+	// PathEscape and EscapeString are belt and braces: newToken only ever
+	// produces hex. They are what make TestIndexHTMLEscapes mean something.
+	base := "/d/" + url.PathEscape(token)
+
 	b.WriteString(`<!doctype html>` + "\n")
 	b.WriteString(`<html lang="en">` + "\n<head>\n")
 	b.WriteString(`<meta charset="utf-8"></meta>` + "\n")
@@ -37,7 +51,8 @@ func IndexHTML(token string, shares []Share, allowUpload bool) string {
 	} else {
 		b.WriteString("<ul>\n")
 		for i, share := range shares {
-			b.WriteString(`<li><a href="f/` + strconv.Itoa(i) + `">` + html.EscapeString(share.Name) +
+			b.WriteString(`<li><a href="` + html.EscapeString(base+"/f/"+strconv.Itoa(i)) + `">` +
+				html.EscapeString(share.Name) +
 				`</a> <span class="size">` + humanBytes(share.Bytes) + `</span></li>` + "\n")
 		}
 		b.WriteString("</ul>\n")
@@ -45,7 +60,8 @@ func IndexHTML(token string, shares []Share, allowUpload bool) string {
 
 	if allowUpload {
 		b.WriteString(`<h2>Send a file back</h2>` + "\n")
-		b.WriteString(`<form method="post" action="up" enctype="multipart/form-data">` + "\n")
+		b.WriteString(`<form method="post" action="` + html.EscapeString(base+"/up") +
+			`" enctype="multipart/form-data">` + "\n")
 		b.WriteString(`<input type="file" name="file"></input>` + "\n")
 		b.WriteString(`<button type="submit">Send</button>` + "\n")
 		b.WriteString("</form>\n")

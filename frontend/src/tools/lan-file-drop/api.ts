@@ -51,6 +51,7 @@ interface Bound {
       // package means writing no QR encoder, not refusing to call the one that
       // is there. This tool does not touch internal/tools/qrgen or app_qrgen.go.
       GenerateQR?: (p: QrParams) => Promise<QrCode>
+      FirewallHint?: (port: number, proto: string) => Promise<FirewallHint>
     }
   }
 }
@@ -134,6 +135,31 @@ export async function generateQr(text: string): Promise<QrCode | null> {
       hidden: false,
       ecLevel: '',
     })
+  } catch {
+    return null
+  }
+}
+
+/** Mirrors firewall.Hint in internal/firewall/firewall.go. Every field is empty
+ *  when nothing was detected, which the page renders as nothing at all. */
+export interface FirewallHint {
+  firewall: string
+  message: string
+  command: string
+}
+
+/**
+ * Whether a firewall on this computer might be dropping the connections the
+ * other machine is making. A dropped packet produces no error at either end, so
+ * without this the page cannot tell "blocked" from "nobody has tried yet".
+ * Empty outside the desktop app, and it must never throw: this is a hint beside
+ * a working share, not the thing the user asked for.
+ */
+export async function firewallHint(port: number, proto: string): Promise<FirewallHint | null> {
+  const fn = bound().main?.App?.FirewallHint
+  if (!fn) return null
+  try {
+    return await fn(port, proto)
   } catch {
     return null
   }

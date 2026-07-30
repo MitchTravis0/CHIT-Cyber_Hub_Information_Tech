@@ -2,6 +2,9 @@
 // downloads or replaces anything: it compares two version strings and hands the
 // settings page a link. This sits beside internal/core and internal/store rather
 // than under internal/tools, because it is app-level and belongs to no tool.
+// Downloading and installing a release is internal/selfupdate's job, added in
+// Phase 10 at the repo owner's request; this package stays read-only so the
+// smaller promise is still visible in one place.
 //
 // Nothing here runs unless a person presses the button. CHIT is handed to junior
 // techs on customer networks, so it does not contact GitHub on its own.
@@ -53,15 +56,27 @@ type Result struct {
 	Published string `json:"published"`
 	// Note is the sentence to show. Always set.
 	Note string `json:"note"`
+	// Assets is what the release carries, for internal/selfupdate to pick the
+	// right download from. Never shipped to the page.
+	Assets []Asset `json:"-"`
+}
+
+// Asset is one downloadable file on a release. The json tags are GitHub's own
+// field names: this struct is parsed from the API answer, never sent to the UI.
+type Asset struct {
+	Name string `json:"name"`
+	URL  string `json:"browser_download_url"`
+	Size int64  `json:"size"`
 }
 
 // release is the part of GitHub's answer this package reads.
 type release struct {
-	TagName     string `json:"tag_name"`
-	HTMLURL     string `json:"html_url"`
-	PublishedAt string `json:"published_at"`
-	Draft       bool   `json:"draft"`
-	Prerelease  bool   `json:"prerelease"`
+	TagName     string  `json:"tag_name"`
+	HTMLURL     string  `json:"html_url"`
+	PublishedAt string  `json:"published_at"`
+	Draft       bool    `json:"draft"`
+	Prerelease  bool    `json:"prerelease"`
+	Assets      []Asset `json:"assets"`
 }
 
 // Check asks GitHub for the latest release and compares it with current.
@@ -123,6 +138,7 @@ func Check(ctx context.Context, current string) (Result, error) {
 		return out, nil
 	}
 	out.Latest = strings.TrimPrefix(latest, "v")
+	out.Assets = rel.Assets
 	if rel.HTMLURL != "" {
 		out.URL = rel.HTMLURL
 	}
@@ -133,9 +149,9 @@ func Check(ctx context.Context, current string) (Result, error) {
 	out.Newer = IsNewer(current, latest)
 	switch {
 	case out.Newer:
-		out.Note = fmt.Sprintf(
-			"Version %s is available. You are running %s. CHIT does not update itself: download the new file and replace this one.",
-			out.Latest, current)
+		// What to do about it (the Install button, or why there is none) is the
+		// settings page's story, told from selfupdate.Status.
+		out.Note = fmt.Sprintf("Version %s is available. You are running %s.", out.Latest, current)
 	case Compare(current, latest) > 0:
 		out.Note = fmt.Sprintf(
 			"You are running %s, which is newer than the latest published release (%s). This is a development build.",

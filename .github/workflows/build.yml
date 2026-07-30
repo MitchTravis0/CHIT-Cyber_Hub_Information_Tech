@@ -138,6 +138,12 @@ jobs:
           path: dist
           merge-multiple: true
 
+      # The in-app updater (internal/selfupdate) refuses a release without
+      # this file, so it must keep exactly this name and the standard
+      # "hash  name" sha256sum format.
+      - name: Checksums
+        run: cd dist && sha256sum * > sha256sums.txt
+
       - uses: softprops/action-gh-release@v3
         with:
           files: dist/*

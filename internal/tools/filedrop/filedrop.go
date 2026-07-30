@@ -18,6 +18,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -268,15 +269,71 @@ func Addresses(primaryIP string) ([]Address, error) {
 		}
 	}
 
-	// The address this machine routes through goes first: on a laptop with
-	// wifi and a cable at once, only one of them is the right one.
-	for i := range out {
-		if out[i].Primary && i > 0 {
-			out[0], out[i] = out[i], out[0]
-			break
+	orderForSharing(out)
+	return out, nil
+}
+
+// orderForSharing puts the address another machine is most likely to reach
+// first, because the page builds its link from out[0] and most techs never
+// open the picker.
+//
+// Three ranks: the address this machine actually routes through, then ordinary
+// adapters, then the container and hypervisor adapters that look like a network
+// and are not one. Reported from real use on 2026-07-29, on a machine running
+// Docker: the page offered http://172.17.0.1:8722/... first, which nothing else
+// on the network can reach, and the tech had no way to tell why. Before this
+// the only ordering was "move the primary to the front", so when
+// netinfo.PrimarySubnet could not name a primary (it returns an error rather
+// than a guess) the order was whatever the operating system listed, and on that
+// machine that was Docker.
+//
+// The sort is stable, so within a rank the operating system's own order is kept.
+func orderForSharing(addrs []Address) {
+	sort.SliceStable(addrs, func(i, j int) bool {
+		return shareRank(addrs[i]) < shareRank(addrs[j])
+	})
+}
+
+func shareRank(a Address) int {
+	switch {
+	case a.Primary:
+		return 0
+	case virtualAdapter(a.Adapter):
+		return 2
+	default:
+		return 1
+	}
+}
+
+// virtualPrefixes matches on the adapter NAME, never on the address range: a
+// real office LAN can legitimately sit anywhere in 172.16/12, which is also
+// where Docker's default bridge lives, so the range tells you nothing.
+//
+// "br-" carries the hyphen on purpose. That is Docker's own bridge naming
+// (br-9f2c...); a plain "br0" is usually a real bridge doing real work on a
+// server and must not be demoted.
+var virtualPrefixes = []string{
+	// Linux: docker, docker user networks, container veth pairs, libvirt,
+	// VMware, VirtualBox.
+	"docker", "br-", "veth", "virbr", "vmnet", "vboxnet",
+	// Windows: Hyper-V and WSL switches, VMware, VirtualBox.
+	"vethernet", "vmware", "virtualbox",
+	// VPN and overlay tunnels, on every OS.
+	"utun", "tun", "tap", "wg", "zt", "tailscale",
+}
+
+// virtualAdapter reports whether the name looks like a container, hypervisor or
+// tunnel adapter rather than a network the other machine is on. Primary always
+// outranks this, so a machine whose only route out is a Hyper-V "vEthernet"
+// bridge still offers that first.
+func virtualAdapter(name string) bool {
+	lower := strings.ToLower(name)
+	for _, prefix := range virtualPrefixes {
+		if strings.HasPrefix(lower, prefix) {
+			return true
 		}
 	}
-	return out, nil
+	return false
 }
 
 // usableForSharing rejects the addresses another machine could never reach this

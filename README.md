@@ -147,8 +147,10 @@ CHIT is built for machines you are responsible for, so it is explicit about what
 
 - **Nothing is sent anywhere you did not ask about.** No telemetry, no analytics, no crash
   reporting, and no background requests of any kind.
-- **The update check runs only when you press the button** in Settings, and only asks GitHub for the
-  latest release number. There is no self-patching.
+- **The update check runs only when you press the button** in Settings, and only asks GitHub for
+  the latest release number. Installing an update is a second, separate button: nothing is
+  downloaded until you press it, the download must match the checksum the release publishes or
+  nothing is replaced, and CHIT never checks or installs on its own.
 - **Tools that must reach the internet say so on the page** and name the service before you press
   anything: Cloudflare for the speed test, `ipinfo.io` for the public address, Have I Been Pwned for
   the breach check (which uses k-anonymity, so only the first five characters of a hash leave the
@@ -242,11 +244,16 @@ The first time you open CHIT it shows a five page welcome tour: how to find a to
 recents, the three tools that open a port, and where your data lives. It never appears again. You
 can bring it back from **Settings > Help > Show the tour**.
 
-Settings also has a **Check for updates** button. It asks GitHub whether a newer release exists and,
-if there is one, links you to the download. **CHIT never checks on its own and never updates
-itself**: there is no background request and no self-patching, so handing the executable to a
-colleague on a customer network does not quietly add traffic. Updating is downloading the new file
-and replacing the old one.
+Settings also has a **Check for updates** button. It asks GitHub whether a newer release exists
+and, if there is one, offers to install it: press **Install**, CHIT downloads the release for your
+machine, checks it against the checksum the release publishes, and swaps it into place. Nothing
+changes if any step fails, and the version you were running is put back if the swap itself goes
+wrong. Restart when you are ready, or keep working; the new version takes over the next time CHIT
+starts. **CHIT never checks or installs on its own**: there is no background request, so handing
+the executable to a colleague on a customer network does not quietly add traffic. If CHIT cannot
+update itself where it is (a folder it may not write to, a machine its releases do not cover), it
+says so in one sentence and links you to the download page instead; it never asks for
+administrator rights.
 
 ## Where CHIT keeps its settings
 

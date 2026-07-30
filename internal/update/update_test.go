@@ -108,7 +108,11 @@ func TestCheckFindsANewerRelease(t *testing.T) {
 	serve(t, http.StatusOK, `{
 		"tag_name": "v1.4.0",
 		"html_url": "https://github.com/MitchTravis0/CHIT-Cyber_Hub_Information_Tech/releases/tag/v1.4.0",
-		"published_at": "2026-08-01T09:30:00Z"
+		"published_at": "2026-08-01T09:30:00Z",
+		"assets": [
+			{"name": "chit-linux-amd64.tar.gz", "browser_download_url": "https://example.com/d/chit-linux-amd64.tar.gz", "size": 7340032},
+			{"name": "sha256sums.txt", "browser_download_url": "https://example.com/d/sha256sums.txt", "size": 300}
+		]
 	}`)
 
 	got, err := Check(context.Background(), "1.0.0")
@@ -130,10 +134,20 @@ func TestCheckFindsANewerRelease(t *testing.T) {
 	if got.URL != "https://github.com/MitchTravis0/CHIT-Cyber_Hub_Information_Tech/releases/tag/v1.4.0" {
 		t.Errorf("URL = %q", got.URL)
 	}
-	for _, want := range []string{"1.4.0", "1.0.0", "does not update itself"} {
+	for _, want := range []string{"1.4.0", "1.0.0"} {
 		if !strings.Contains(got.Note, want) {
 			t.Errorf("Note = %q, want it to contain %q", got.Note, want)
 		}
+	}
+	// selfupdate picks its download out of this list, so losing it silently
+	// would turn every release into "no download for this machine".
+	if len(got.Assets) != 2 {
+		t.Fatalf("Assets = %v, want the 2 the release carries", got.Assets)
+	}
+	if got.Assets[0].Name != "chit-linux-amd64.tar.gz" ||
+		got.Assets[0].URL != "https://example.com/d/chit-linux-amd64.tar.gz" ||
+		got.Assets[0].Size != 7340032 {
+		t.Errorf("Assets[0] = %+v, want the name, URL and size GitHub sent", got.Assets[0])
 	}
 }
 
@@ -298,8 +312,9 @@ func TestNoteIsAlwaysSet(t *testing.T) {
 }
 
 // This package must never gain the ability to write to disk or run anything.
-// "Check for updates" that could replace the executable is a different and much
-// larger promise than the one the settings page makes.
+// Since Phase 10 the app can replace its own executable, but that larger
+// promise lives entirely in internal/selfupdate, where its safeguards are
+// tested; this package stays the read-only half so the split is enforceable.
 func TestPackageNeverWritesOrExecutes(t *testing.T) {
 	source := readSource(t)
 	for _, banned := range []string{"os.WriteFile", "os.Create", "os.OpenFile", "os.Remove", "exec.Command", "os.Rename"} {

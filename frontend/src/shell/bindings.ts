@@ -9,7 +9,8 @@ export interface AppInfo {
   portable: boolean
 }
 
-/** Mirrors update.Result in internal/update/update.go. */
+/** Mirrors selfupdate.Status in internal/selfupdate/selfupdate.go, which
+ *  embeds update.Result, so the JSON is one flat object. */
 export interface UpdateResult {
   current: string
   latest: string
@@ -17,6 +18,10 @@ export interface UpdateResult {
   newer: boolean
   published: string
   note: string
+  canInstall: boolean
+  installNote: string
+  assetName: string
+  assetSize: number
 }
 
 interface Bound {
@@ -24,6 +29,8 @@ interface Bound {
     App?: {
       GetAppInfo?: () => Promise<AppInfo>
       CheckForUpdate?: () => Promise<UpdateResult>
+      StartInstallUpdate?: () => Promise<string>
+      RestartForUpdate?: () => Promise<boolean>
     }
   }
   store?: {
@@ -50,6 +57,21 @@ export async function getAppInfo(): Promise<AppInfo | null> {
 export async function checkForUpdate(): Promise<UpdateResult> {
   const fn = bound().main?.App?.CheckForUpdate
   if (!fn) throw new Error('Checking for updates is only available in the desktop app.')
+  return fn()
+}
+
+/** Resolves to the install job's id; progress arrives over the job events.
+ *  The backend re-checks the release itself, so this takes nothing. */
+export async function startInstallUpdate(): Promise<string> {
+  const fn = bound().main?.App?.StartInstallUpdate
+  if (!fn) throw new Error('Installing updates is only available in the desktop app.')
+  return fn()
+}
+
+/** Starts the newly installed version and quits this one. */
+export async function restartForUpdate(): Promise<boolean> {
+  const fn = bound().main?.App?.RestartForUpdate
+  if (!fn) throw new Error('Restarting is only available in the desktop app.')
   return fn()
 }
 

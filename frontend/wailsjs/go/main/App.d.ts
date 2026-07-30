@@ -5,7 +5,7 @@ import {renamer} from '../models';
 import {battery} from '../models';
 import {wol} from '../models';
 import {maildns} from '../models';
-import {update} from '../models';
+import {selfupdate} from '../models';
 import {ntpcheck} from '../models';
 import {hibp} from '../models';
 import {sitecheck} from '../models';
@@ -14,6 +14,7 @@ import {hashfile} from '../models';
 import {dnslook} from '../models';
 import {certdec} from '../models';
 import {filedrop} from '../models';
+import {firewall} from '../models';
 import {certgen} from '../models';
 import {qrgen} from '../models';
 import {main} from '../models';
@@ -55,7 +56,7 @@ export function CheckAwake(arg1:string):Promise<wol.Awake>;
 
 export function CheckEmailDNS(arg1:maildns.Params):Promise<maildns.Report>;
 
-export function CheckForUpdate():Promise<update.Result>;
+export function CheckForUpdate():Promise<selfupdate.Status>;
 
 export function CheckNTPTime(arg1:ntpcheck.Params):Promise<ntpcheck.Report>;
 
@@ -86,6 +87,8 @@ export function ExportTOTPVault():Promise<string>;
 export function FileDropAddresses():Promise<Array<filedrop.Address>>;
 
 export function FileDropSession(arg1:string):Promise<filedrop.Session>;
+
+export function FirewallHint(arg1:number,arg2:string):Promise<firewall.Hint>;
 
 export function GenerateCSR(arg1:certgen.Params):Promise<certgen.Result>;
 
@@ -147,6 +150,8 @@ export function ReadLog(arg1:logview.ReadParams):Promise<logview.Chunk>;
 
 export function RemoveTOTPAccount(arg1:string):Promise<totp.Status>;
 
+export function RestartForUpdate():Promise<boolean>;
+
 export function ScanDefaults():Promise<ipscan.Defaults>;
 
 export function SendPrinterTestPage(arg1:rawprint.Params):Promise<rawprint.Result>;
@@ -166,6 +171,8 @@ export function StartFileDrop(arg1:filedrop.Params):Promise<string>;
 export function StartFileHash(arg1:hashfile.Params):Promise<string>;
 
 export function StartIPScan(arg1:ipscan.ScanParams):Promise<string>;
+
+export function StartInstallUpdate():Promise<string>;
 
 export function StartInternetTriage(arg1:triage.Params):Promise<string>;
 

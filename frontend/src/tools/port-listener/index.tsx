@@ -13,7 +13,14 @@ import {
 } from '../../components'
 import { formatDuration } from '../../lib/format'
 import { useJob } from '../../lib/useJob'
-import { listenerAddresses, startPortListener, type Address, type Hit } from './api'
+import {
+  firewallHint,
+  listenerAddresses,
+  startPortListener,
+  type Address,
+  type FirewallHint,
+  type Hit,
+} from './api'
 import { arrivalLine, commandsFor, hitId, localTime, validPort } from './commands'
 
 const PROTOCOLS = [
@@ -30,6 +37,7 @@ export default function PortListenerPage() {
   const [protocol, setProtocol] = useState('tcp')
   const [addresses, setAddresses] = useState<Address[]>([])
   const [chosenIp, setChosenIp] = useState('')
+  const [wall, setWall] = useState<FirewallHint | null>(null)
 
   useEffect(() => {
     void listenerAddresses().then((found) => {
@@ -90,6 +98,24 @@ export default function PortListenerPage() {
   const parsedPort = validPort(port)
   const listeningPort = parsedPort.ok && parsedPort.port !== 0 ? parsedPort.port : 8730
   const commands = chosenIp === '' ? [] : commandsFor(chosenIp, listeningPort, protocol)
+
+  // A firewall dropping the other machine's packets produces no error at either
+  // end, so a listener that hears nothing looks identical to one that is
+  // blocked. Keyed on listeningPort rather than re-deriving the default here,
+  // so there is one place that decides which port is open.
+  useEffect(() => {
+    if (!running) {
+      setWall(null)
+      return
+    }
+    let current = true
+    void firewallHint(listeningPort, protocol).then((hint) => {
+      if (current) setWall(hint)
+    })
+    return () => {
+      current = false
+    }
+  }, [running, listeningPort, protocol])
 
   return (
     <ToolShell
@@ -224,6 +250,17 @@ export default function PortListenerPage() {
               This port is open to the whole network while you are listening. Press Stop when the
               test is done.
             </p>
+
+            {wall !== null && wall.message !== '' && (
+              <div className="rounded border border-warn bg-warn/10 px-3 py-2">
+                <p className="text-sm text-fg">{wall.message}</p>
+                {wall.command !== '' && (
+                  <div className="mt-2">
+                    <CopyButton value={wall.command} label="Copy the command" />
+                  </div>
+                )}
+              </div>
+            )}
 
             <p className="text-xs text-fg-muted">{arrivalLine(results)}</p>
           </>

@@ -609,6 +609,27 @@ export namespace filedrop {
 
 }
 
+export namespace firewall {
+	
+	export class Hint {
+	    firewall: string;
+	    message: string;
+	    command: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Hint(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.firewall = source["firewall"];
+	        this.message = source["message"];
+	        this.command = source["command"];
+	    }
+	}
+
+}
+
 export namespace hashfile {
 	
 	export class Digests {
@@ -1943,6 +1964,41 @@ export namespace renamer {
 
 }
 
+export namespace selfupdate {
+	
+	export class Status {
+	    current: string;
+	    latest: string;
+	    url: string;
+	    newer: boolean;
+	    published: string;
+	    note: string;
+	    canInstall: boolean;
+	    installNote: string;
+	    assetName: string;
+	    assetSize: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new Status(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.current = source["current"];
+	        this.latest = source["latest"];
+	        this.url = source["url"];
+	        this.newer = source["newer"];
+	        this.published = source["published"];
+	        this.note = source["note"];
+	        this.canInstall = source["canInstall"];
+	        this.installNote = source["installNote"];
+	        this.assetName = source["assetName"];
+	        this.assetSize = source["assetSize"];
+	    }
+	}
+
+}
+
 export namespace sitecheck {
 	
 	export class Hop {
@@ -2650,33 +2706,6 @@ export namespace triage {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.timeoutMs = source["timeoutMs"];
-	    }
-	}
-
-}
-
-export namespace update {
-	
-	export class Result {
-	    current: string;
-	    latest: string;
-	    url: string;
-	    newer: boolean;
-	    published: string;
-	    note: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new Result(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.current = source["current"];
-	        this.latest = source["latest"];
-	        this.url = source["url"];
-	        this.newer = source["newer"];
-	        this.published = source["published"];
-	        this.note = source["note"];
 	    }
 	}
 
