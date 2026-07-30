@@ -156,12 +156,17 @@ func TestRunInstallReplacesTheLinuxBinary(t *testing.T) {
 }
 
 func TestRunInstallReplacesTheMacBundle(t *testing.T) {
-	dir := t.TempDir()
-	inner := filepath.Join(dir, "chit.app", "Contents", "MacOS")
+	// The bundle path is built in slash form on purpose: a real macOS
+	// executable path always uses forward slashes, and filepath.Join on a
+	// Windows CI runner would produce backslashes no Mac can ever hand to
+	// targetFor. Windows file APIs accept forward slashes, so this shape is
+	// valid to create everywhere.
+	dir := filepath.ToSlash(t.TempDir())
+	inner := dir + "/chit.app/Contents/MacOS"
 	if err := os.MkdirAll(inner, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	exe := filepath.Join(inner, "chit")
+	exe := inner + "/chit"
 	mustWrite(t, exe, "the old mac binary")
 
 	zipAsset := fakeAsset{name: "chit-macos-universal.zip", content: appZip(t, "the new mac binary")}
@@ -172,14 +177,14 @@ func TestRunInstallReplacesTheMacBundle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if version != "9.9.9" || target != filepath.Join(dir, "chit.app") {
+	if version != "9.9.9" || target != dir+"/chit.app" {
 		t.Errorf("version = %q target = %q, want the bundle root", version, target)
 	}
 	content, err := os.ReadFile(exe)
 	if err != nil || string(content) != "the new mac binary" {
 		t.Fatalf("bundle binary = %q, %v", content, err)
 	}
-	if plist, _ := os.ReadFile(filepath.Join(dir, "chit.app", "Contents", "Info.plist")); string(plist) != "<plist/>" {
+	if plist, _ := os.ReadFile(dir + "/chit.app/Contents/Info.plist"); string(plist) != "<plist/>" {
 		t.Errorf("Info.plist = %q, want the new bundle's", plist)
 	}
 	noStageLeftovers(t, dir)
@@ -420,8 +425,11 @@ func TestStartInstallRunsTheJobAndRecordsTheInstall(t *testing.T) {
 	tarball := fakeAsset{name: "chit-linux-amd64.tar.gz", content: makeTarGz(t, map[string]string{"chit": "the new binary"})}
 	serveRelease(t, "v9.9.9", []fakeAsset{tarball, {name: "sha256sums.txt", content: sumsFor(tarball)}})
 
+	// The platform is pinned to the fixture's asset rather than inherited from
+	// the runner: this test is about the job wiring, and the per-OS plans each
+	// have their own end-to-end test above.
 	jobs := core.NewJobManager()
-	jobID, err := startInstallAt(jobs, "1.0.0", exe)
+	jobID, err := startInstallAt(jobs, "1.0.0", exe, "linux", "amd64")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -454,7 +462,7 @@ func TestStartInstallRunsTheJobAndRecordsTheInstall(t *testing.T) {
 	}
 
 	// pressing Install again now must refuse and point at the restart
-	_, err = startInstallAt(jobs, "1.0.0", exe)
+	_, err = startInstallAt(jobs, "1.0.0", exe, "linux", "amd64")
 	if err == nil || !strings.Contains(err.Error(), "Restart CHIT") {
 		t.Errorf("second install err = %v, want the restart sentence", err)
 	}
@@ -466,7 +474,7 @@ func TestStartInstallWhileOneIsRunning(t *testing.T) {
 	state.installing = true
 	state.mu.Unlock()
 
-	_, err := startInstallAt(core.NewJobManager(), "1.0.0", "/nowhere/chit")
+	_, err := startInstallAt(core.NewJobManager(), "1.0.0", "/nowhere/chit", "linux", "amd64")
 	if err == nil || !strings.Contains(err.Error(), "already being installed") {
 		t.Errorf("err = %v, want the already-installing sentence", err)
 	}

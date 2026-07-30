@@ -233,12 +233,14 @@ func StartInstall(jobs *core.JobManager, current string) (string, error) {
 		return "", core.Errorf(core.CodeInternal,
 			"CHIT could not work out where its own executable is, so it cannot replace it.")
 	}
-	return startInstallAt(jobs, current, exe)
+	return startInstallAt(jobs, current, exe, runtime.GOOS, runtime.GOARCH)
 }
 
-// startInstallAt is StartInstall with the executable path injectable, so a
-// test can run the whole job against a file that is not the test binary.
-func startInstallAt(jobs *core.JobManager, current, exe string) (string, error) {
+// startInstallAt is StartInstall with the executable path and platform
+// injectable, so a test can run the whole job against a file that is not the
+// test binary, on any CI runner: a closure that captured runtime.GOOS would
+// make the job demand a different release asset on every platform.
+func startInstallAt(jobs *core.JobManager, current, exe, goos, goarch string) (string, error) {
 	state.mu.Lock()
 	if state.installing {
 		state.mu.Unlock()
@@ -257,7 +259,7 @@ func startInstallAt(jobs *core.JobManager, current, exe string) (string, error) 
 	return jobs.Start(JobKind, 0, func(jc *core.JobContext) error {
 		defer clearInstalling()
 		sink := Sink{Progress: jc.Progress, Summary: jc.SetSummary}
-		version, target, err := runInstall(jc.Ctx(), sink, current, exe, runtime.GOOS, runtime.GOARCH)
+		version, target, err := runInstall(jc.Ctx(), sink, current, exe, goos, goarch)
 		if err != nil {
 			return err
 		}
